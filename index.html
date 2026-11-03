@@ -17,10 +17,11 @@
   --accent: #0f7a55;
   --accent-fg: #ffffff;
   --accent-soft: #dff1e9;
-  --ok: #0f7a55; --ok-soft: #dff1e9;
-  --warn: #9a5b00; --warn-soft: #fbeed6;
-  --bad: #b3261e; --bad-soft: #fbe3e1;
-  --info: #2f5aa8; --info-soft: #e1e9f8;
+  --t0: #0f7a55; --t0-soft: #dff1e9;
+  --t1: #9a5b00; --t1-soft: #fbeed6;
+  --t2: #2f5aa8; --t2-soft: #e1e9f8;
+  --t3: #b3261e; --t3-soft: #fbe3e1;
+  --t4: #6b3fa0; --t4-soft: #ece3f7;
   --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
   --font-num: "IBM Plex Mono", ui-monospace, Consolas, monospace;
@@ -30,16 +31,18 @@
   :root:not([data-theme="light"]) {
     --bg: #0f1513; --surface: #18201d; --fg: #e6ece9; --muted: #95a39d; --line: #2a3531;
     --accent: #3fc28f; --accent-fg: #062118; --accent-soft: #173a2d;
-    --ok: #3fc28f; --ok-soft: #173a2d; --warn: #e9a945; --warn-soft: #3a2d14;
-    --bad: #f0857c; --bad-soft: #3d1d1b; --info: #8fb0ef; --info-soft: #1d2a42;
+    --t0: #3fc28f; --t0-soft: #173a2d; --t1: #e9a945; --t1-soft: #3a2d14;
+    --t2: #8fb0ef; --t2-soft: #1d2a42; --t3: #f0857c; --t3-soft: #3d1d1b;
+    --t4: #c3a3ef; --t4-soft: #2e2240;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f1513; --surface: #18201d; --fg: #e6ece9; --muted: #95a39d; --line: #2a3531;
   --accent: #3fc28f; --accent-fg: #062118; --accent-soft: #173a2d;
-  --ok: #3fc28f; --ok-soft: #173a2d; --warn: #e9a945; --warn-soft: #3a2d14;
-  --bad: #f0857c; --bad-soft: #3d1d1b; --info: #8fb0ef; --info-soft: #1d2a42;
+  --t0: #3fc28f; --t0-soft: #173a2d; --t1: #e9a945; --t1-soft: #3a2d14;
+  --t2: #8fb0ef; --t2-soft: #1d2a42; --t3: #f0857c; --t3-soft: #3d1d1b;
+  --t4: #c3a3ef; --t4-soft: #2e2240;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -55,48 +58,54 @@ body {
 .wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
 h1 { font: 700 1.6rem/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; }
 h2 { font: 600 0.75rem/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+header > div { min-width: 0; }
 .sub { color: var(--muted); font-size: 0.875rem; }
+.mode { display: inline-flex; align-items: center; gap: 6px; }
+.mode::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.mode.live::before { background: var(--accent); }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+.panel summary { cursor: pointer; }
 label { font-size: 0.8rem; font-weight: 600; color: var(--muted); display: grid; gap: 4px; }
 input, select, textarea {
   font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
   border-radius: 8px; padding: 10px 12px; width: 100%; min-width: 0;
 }
 textarea { resize: vertical; min-height: 64px; }
-input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .row:focus-visible {
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .row:focus-visible, .call:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.inline { display: flex; gap: 8px; flex-wrap: wrap; }
-.inline > input { flex: 1 1 200px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.help { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; font-size: 0.875rem; }
+.help ol { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.help pre { margin: 0; max-height: 160px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 500 0.72rem/1.45 var(--font-num); }
 
 button {
   font: 600 0.9rem/1 var(--font-body); border-radius: 8px; padding: 11px 14px; cursor: pointer;
   border: 1px solid var(--line); background: var(--surface); color: var(--fg);
 }
 button:hover { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 button.link { background: none; border: none; color: var(--accent); padding: 4px 0; }
-.msg { font-size: 0.85rem; color: var(--bad); }
+.msg { font-size: 0.85rem; color: var(--t3); margin: 0; }
 .msg.ok { color: var(--muted); }
 
-/* progress */
 .progress { display: grid; gap: 6px; }
 .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
-.stats { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.syncbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.85rem; padding: 8px 12px; border-radius: 8px; background: var(--t1-soft); color: var(--t1); }
 
-/* current contact */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -12px rgba(0,0,0,.12); }
 .pos { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .name { font: 700 1.5rem/1.15 var(--font-display); margin: 0; overflow-wrap: anywhere; }
 .number { font: 500 1.35rem/1.2 var(--font-num); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; user-select: all; overflow-wrap: anywhere; }
-.number.invalid { color: var(--bad); }
+.number.invalid { color: var(--t3); }
 .fields { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 0.875rem; }
 .fields dt { color: var(--muted); }
-.fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-line; }
 .call {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   background: var(--accent); color: var(--accent-fg); text-decoration: none;
@@ -104,26 +113,29 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 }
 .call svg { width: 22px; height: 22px; }
 .call[aria-disabled="true"] { opacity: .4; pointer-events: none; }
-.outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.outcomes button { padding: 12px 6px; font-size: 0.85rem; }
+.statushead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.outcomes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.outcomes button { padding: 12px 6px; font-size: 0.85rem; overflow-wrap: anywhere; }
 .outcomes button kbd { font: 500 0.7rem var(--font-num); color: var(--muted); margin-left: 4px; }
 .outcomes button.on { border-width: 2px; }
+.saved { font-size: 0.8rem; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.saved.err { color: var(--t3); }
 .nav { display: flex; justify-content: space-between; gap: 8px; }
 .nav button { flex: 1; }
 
-/* status chips */
-.chip { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; white-space: nowrap; background: var(--bg); color: var(--muted); }
-.s-answered { background: var(--ok-soft); color: var(--ok); border-color: var(--ok) !important; }
-.s-noanswer, .s-busy { background: var(--warn-soft); color: var(--warn); border-color: var(--warn) !important; }
-.s-voicemail, .s-callback { background: var(--info-soft); color: var(--info); border-color: var(--info) !important; }
-.s-wrong { background: var(--bad-soft); color: var(--bad); border-color: var(--bad) !important; }
+.chip { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; white-space: nowrap; background: var(--bg); color: var(--muted); border: 1px solid transparent; }
+.tone0 { background: var(--t0-soft) !important; color: var(--t0) !important; border-color: var(--t0) !important; }
+.tone1 { background: var(--t1-soft) !important; color: var(--t1) !important; border-color: var(--t1) !important; }
+.tone2 { background: var(--t2-soft) !important; color: var(--t2) !important; border-color: var(--t2) !important; }
+.tone3 { background: var(--t3-soft) !important; color: var(--t3) !important; border-color: var(--t3) !important; }
+.tone4 { background: var(--t4-soft) !important; color: var(--t4) !important; border-color: var(--t4) !important; }
+.chip.tone0, .chip.tone1, .chip.tone2, .chip.tone3, .chip.tone4 { border-color: transparent !important; }
 
-/* queue */
 .qhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .qhead label { display: flex; align-items: center; gap: 6px; font-weight: 500; }
 .qhead input { width: auto; }
 .queue { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); max-height: 360px; overflow-y: auto; }
-.row { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.row { display: grid; grid-template-columns: 2.6em 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .row:last-child { border-bottom: none; }
 .row.cur { background: var(--accent-soft); }
 .row .i { color: var(--muted); font: 500 0.8rem var(--font-num); }
@@ -131,42 +143,64 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .row .who b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .who span { font: 500 0.8rem var(--font-num); color: var(--muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; }
-@media (max-width: 380px) { .outcomes { grid-template-columns: repeat(2, 1fr); } .row2 { grid-template-columns: 1fr; } }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; max-width: calc(100vw - 32px); }
+@media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Sheet Dialer</h1>
-    <span class="sub" id="sheetLabel">Sample list</span>
+    <div>
+      <h1>Sheet Dialer</h1>
+      <span class="sub mode" id="modeLabel">Sample list</span>
+    </div>
+    <button id="refreshBtn">Refresh</button>
   </header>
 
   <details class="panel" id="setup">
-    <summary><strong>Connect a Google Sheet</strong></summary>
-    <p class="sub" style="margin:0">In Google Sheets, click <b>Share</b> → <b>General access</b> → <b>Anyone with the link</b> (Viewer). Then paste the link here. The tab open in the link is the one that loads.</p>
-    <div class="inline">
+    <summary><strong>Connect your Google Sheet</strong></summary>
+    <label>Sheet updates link (from Apps Script)
+      <input id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    </label>
+    <label>Google Sheet link (opens on the tab in the link)
       <input id="sheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
-      <button class="primary" id="loadBtn">Load sheet</button>
-    </div>
-    <div class="row2">
+    </label>
+    <button class="primary" id="loadBtn">Load sheet</button>
+    <p class="msg ok" id="msg"></p>
+    <label id="tabWrap" hidden>Tab <select id="tabSel"></select></label>
+    <div class="grid2">
       <label>Name column <select id="nameCol"></select></label>
       <label>Phone column <select id="phoneCol"></select></label>
+      <label>Status column <select id="statusCol"></select></label>
+      <label>Notes column <select id="notesCol"></select></label>
     </div>
     <label>Country code for numbers without one (optional)
-      <input id="cc" placeholder="e.g. +1 or +91" inputmode="tel">
+      <input id="cc" placeholder="e.g. +65" inputmode="tel">
     </label>
-    <div class="msg ok" id="msg"></div>
+    <div class="help">
+      <strong>Turn on sheet updates (one time)</strong>
+      <span class="sub">With this on, the app reads your tabs and the Status dropdown, and every status you tap is written straight into the sheet. Without it, paste only the Google Sheet link: the app can read a sheet shared as "Anyone with the link", but statuses stay on this device.</span>
+      <ol>
+        <li>In your sheet, open <b>Extensions → Apps Script</b>.</li>
+        <li>Delete what's there, paste the script below, and click <b>Save</b>.</li>
+        <li>Click <b>Deploy → New deployment</b>, choose type <b>Web app</b>, set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then <b>Deploy</b> and allow access.</li>
+        <li>Copy the <b>Web app URL</b> and paste it in the first box above.</li>
+      </ol>
+      <span class="sub">Keep that link private. Anyone who has it can read and change the sheet.</span>
+      <div class="actions"><button id="copyScript">Copy script</button></div>
+      <pre id="scriptText">Loading script…</pre>
+    </div>
   </details>
 
   <div class="progress">
     <div class="bar"><i id="barFill"></i></div>
-    <div class="stats"><span id="statDone">0 of 0 called</span><span id="statAns">0 answered</span></div>
+    <div class="stats"><span id="statDone">0 of 0 have a status</span><span id="statMix"></span></div>
   </div>
+  <div class="syncbar" id="syncBar" hidden><span id="syncText"></span><button class="link" id="retryBtn">Try again</button></div>
 
   <section class="card" id="card">
-    <div class="pos"><span id="pos">1 / 1</span><span class="chip" id="curChip">Not called</span></div>
+    <div class="pos"><span id="pos">Row —</span><span class="chip" id="curChip">No status</span></div>
     <div>
       <p class="name" id="curName">—</p>
       <div class="number" id="curNum">—</div>
@@ -177,10 +211,11 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
     </a>
     <dl class="fields" id="fields"></dl>
     <div>
-      <h2 style="margin-bottom:8px">How did it go?</h2>
+      <div class="statushead"><h2>Status</h2><span class="sub" id="codesSource"></span></div>
       <div class="outcomes" id="outcomes"></div>
     </div>
-    <label>Notes <textarea id="notes" placeholder="Anything to remember about this call"></textarea></label>
+    <label id="notesWrap">Notes <textarea id="notes"></textarea></label>
+    <div class="saved" id="saved"></div>
     <div class="nav">
       <button id="prevBtn">← Back</button>
       <button id="copyNumBtn">Copy number</button>
@@ -191,43 +226,39 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
   <section style="display:grid;gap:10px">
     <div class="qhead">
       <h2>Call list</h2>
-      <label><input type="checkbox" id="pendingOnly"> Only not called</label>
+      <label><input type="checkbox" id="pendingOnly"> Only blank status</label>
     </div>
     <ul class="queue" id="queue"></ul>
-    <div class="actions">
+    <div class="actions" id="localActions">
       <button id="copyResults">Copy results for Sheets</button>
       <button id="dlResults">Download CSV</button>
-      <button class="link" id="resetBtn">Clear outcomes</button>
     </div>
-    <p class="sub" id="resetConfirm" hidden>Clear every outcome and note for this sheet? <button class="link" id="resetYes">Yes, clear</button> · <button class="link" id="resetNo">Keep</button></p>
-    <p class="sub" style="margin:0">Progress is saved on this device. "Copy results" gives you the original columns plus Outcome, Notes and Called at — paste it into a new tab in your sheet.</p>
   </section>
 </div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
-const OUTCOMES = [
-  { id: "answered",  label: "Answered" },
-  { id: "noanswer",  label: "No answer" },
-  { id: "busy",      label: "Busy" },
-  { id: "voicemail", label: "Voicemail" },
-  { id: "callback",  label: "Call back" },
-  { id: "wrong",     label: "Wrong no." },
-];
-const SAMPLE = `Name,Phone,Company,City
-Example: Priya Raman,+1 415 555 0132,Lumen Labs,San Francisco
-Example: Marcus Hale,(212) 555-0187,Hale & Ortiz,New York
-Example: Sofia Delgado,+1 312 555 0144,Northwind Freight,Chicago
-Example: Ken Watanabe,206-555-0119,Cedar Dental,Seattle
-Example: Amara Okafor,+1 512 555 0168,Brightside Realty,Austin`;
+// Used only when the status column has no dropdown in the sheet
+const DEFAULT_CODES = ["npu", "not Intrested", "niu", "wrong number", "cb", "f2f", "Zoom", "Wa Sent"];
+const SAMPLE = `Name,Number,Status,Remarks
+Example: Priya Raman,91234567,npu,
+Example: Marcus Hale,98765432,f2f,Prefers mornings
+Example: Sofia Delgado,90011223,,
+Example: Ken Watanabe,93334444,,
+Example: Amara Okafor,96667777,cb,Call after 6pm`;
 
 const $ = id => document.getElementById(id);
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const colLetter = i => { let s = ""; for (i++; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };
 
-let S = { key: "sample", label: "Sample list", headers: [], rows: [], nameCol: 0, phoneCol: 1, cur: 0, results: {} };
+const cfg = store.get("dialer:cfg", { scriptUrl: "", sheetUrl: "", gid: "", cc: "", cols: {} });
+// S.rows: [{ r: sheet row number (1-based), cells: [...] }]; S.edits: { [r]: { status?, notes?, phone, err? } } not yet in the sheet
+let S = { mode: "sample", key: "sample", label: "Sample list", headers: [], rows: [], cols: {}, cur: 0, sheetCodes: [], tabs: [], gid: "", edits: {} };
+const sending = new Set();
 
 // ---------- CSV ----------
 function parseCSV(text) {
@@ -245,65 +276,109 @@ function parseCSV(text) {
     } else f += c;
   }
   if (f !== "" || row.length) { row.push(f); rows.push(row); }
-  return rows.filter(r => r.some(x => x.trim() !== ""));
+  return rows;
 }
 const csvCell = v => /[",\n\r]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
 
-// ---------- Sheet URL ----------
 function parseSheetUrl(url) {
-  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  const m = (url || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
   if (!m) return null;
   const g = url.match(/[#&?]gid=(\d+)/);
-  return { id: m[1], gid: g ? g[1] : "0" };
+  return { id: m[1], gid: g ? g[1] : "" };
 }
 
-async function loadSheet() {
-  const url = $("sheetUrl").value.trim();
-  const p = parseSheetUrl(url);
-  if (!p) return showMsg("That doesn't look like a Google Sheets link. It should contain /spreadsheets/d/…");
+// ---------- Loading ----------
+async function load() {
+  cfg.scriptUrl = $("scriptUrl").value.trim();
+  cfg.sheetUrl = $("sheetUrl").value.trim();
+  const fromLink = parseSheetUrl(cfg.sheetUrl);
+  if (fromLink && fromLink.gid && fromLink.gid !== cfg.linkGid) { cfg.gid = fromLink.gid; cfg.linkGid = fromLink.gid; }
+  store.set("dialer:cfg", cfg);
+  if (cfg.scriptUrl && !/^https:\/\/script\.google\.com\//.test(cfg.scriptUrl))
+    return showMsg("The sheet updates link should start with https://script.google.com/macros/s/");
+  if (cfg.scriptUrl) return loadLive();
+  if (fromLink) return loadCsv(fromLink);
+  showMsg("Paste the sheet updates link, or a Google Sheet link.");
+}
+
+async function loadLive(statusCol) {
   showMsg("Loading…", true);
-  const src = `https://docs.google.com/spreadsheets/d/${p.id}/gviz/tq?tqx=out:csv&headers=1&gid=${p.gid}`;
+  const key = cfg.scriptUrl + "|" + cfg.gid;
+  const sc = statusCol ?? ((cfg.cols[key] || {}).status);
+  const url = cfg.scriptUrl + "?gid=" + encodeURIComponent(cfg.gid || "") + (sc >= 0 ? "&statusCol=" + (sc + 1) : "");
   try {
-    const res = await fetch(src);
-    const text = await res.text();
-    if (!res.ok || /^\s*<!DOCTYPE|<html/i.test(text)) throw new Error("private");
-    const rows = parseCSV(text);
-    if (rows.length < 2) return showMsg("The sheet loaded but has no rows under the header.");
-    setData(`${p.id}:${p.gid}`, "Google Sheet", rows);
-    store.set("dialer:lastUrl", url);
-    showMsg(`Loaded ${rows.length - 1} contacts.`, true);
-    $("setup").open = false;
+    const res = await fetch(url);
+    const data = await res.json();
+    cfg.gid = String(data.gid);
+    store.set("dialer:cfg", cfg);
+    S.tabs = data.tabs || [];
+    setData("live", cfg.scriptUrl + "|" + cfg.gid, data.name, data.values, data.statusOptions || []);
+    showMsg(`Loaded ${S.rows.length} rows from "${data.name}".`, true);
+    pushEdits();
   } catch (e) {
-    // A private sheet redirects to Google sign-in, which shows up here as a network error
-    showMsg("Couldn't read the sheet. Check that sharing is set to \"Anyone with the link\" and that you're online.");
+    showMsg("Couldn't load from the sheet updates link. Check that it's the Web app URL and that access is set to Anyone.");
   }
 }
 
-function setData(key, label, rows) {
-  // Google pads exports with empty columns; keep only columns that have a header or any value
-  const keep = rows[0].map((_, i) => i).filter(i => rows.some(r => (r[i] || "").trim()));
-  rows = rows.map(r => keep.map(i => r[i] || ""));
-  const headers = rows[0].map(h => h.trim());
-  const saved = store.get("dialer:" + key, {});
+async function loadCsv(p) {
+  showMsg("Loading…", true);
+  const src = `https://docs.google.com/spreadsheets/d/${p.id}/gviz/tq?tqx=out:csv&headers=1&gid=${p.gid || 0}`;
+  try {
+    const res = await fetch(src);
+    const text = await res.text();
+    if (!res.ok || /^\s*<!DOCTYPE|<html/i.test(text)) throw new Error();
+    setData("csv", `${p.id}:${p.gid || 0}`, "Google Sheet (read only)", parseCSV(text), []);
+    showMsg(`Loaded ${S.rows.length} rows. Statuses you set are kept on this device only.`, true);
+  } catch {
+    // A private sheet redirects to Google sign-in, which shows up here as a network error
+    showMsg("Couldn't read the sheet. Check that sharing is set to \"Anyone with the link\", or turn on sheet updates below.");
+  }
+}
+
+function setData(mode, key, label, values, sheetCodes) {
+  const headers = (values[0] || []).map(h => String(h).trim());
+  const rows = values.slice(1).map((cells, i) => ({ r: i + 2, cells: headers.map((_, c) => String(cells[c] ?? "").trim()) }))
+    .filter(row => row.cells.some(Boolean));
+  const saved = cfg.cols[key] || {};
   const guess = (re, fb) => { const i = headers.findIndex(h => re.test(h)); return i >= 0 ? i : fb; };
-  S = {
-    key, label, headers,
-    rows: rows.slice(1).map(r => headers.map((_, i) => (r[i] || "").trim())),
-    nameCol: saved.nameCol ?? guess(/name|contact|customer|lead/i, 0),
-    phoneCol: saved.phoneCol ?? guess(/phone|mobile|cell|number|tel|whatsapp/i, Math.min(1, headers.length - 1)),
-    cur: saved.cur ?? 0,
-    results: saved.results ?? {},
+  const cols = {
+    name: saved.name ?? guess(/name|contact|customer|lead/i, 0),
+    phone: saved.phone ?? guess(/phone|mobile|cell|number|tel|whatsapp/i, Math.min(1, headers.length - 1)),
+    status: saved.status ?? guess(/status|disposition|outcome|result/i, -1),
+    notes: saved.notes ?? -1,
   };
-  if (S.cur >= S.rows.length) S.cur = 0;
-  fillColumnPickers();
+  S = { ...S, mode, key, label, headers, rows, cols, sheetCodes, edits: store.get("dialer:edits:" + key, {}) };
+  // Re-apply changes that haven't reached the sheet yet
+  for (const [r, e] of Object.entries(S.edits)) {
+    const row = rows.find(x => x.r === +r && x.cells[cols.phone] === e.phone) || rows.find(x => x.cells[cols.phone] === e.phone);
+    if (!row) { delete S.edits[r]; continue; }
+    if ("status" in e && cols.status >= 0) row.cells[cols.status] = e.status;
+    if ("notes" in e && cols.notes >= 0) row.cells[cols.notes] = e.notes;
+  }
+  S.cur = firstBlank(0);
+  fillPickers();
   render();
 }
 
-function save() {
-  store.set("dialer:" + S.key, { nameCol: S.nameCol, phoneCol: S.phoneCol, cur: S.cur, results: S.results });
+// ---------- Helpers ----------
+const statusOf = i => S.cols.status >= 0 ? (S.rows[i]?.cells[S.cols.status] || "") : "";
+const callable = i => !!(S.rows[i]?.cells[S.cols.phone]);
+function firstBlank(from) {
+  for (let k = 0; k < S.rows.length; k++) {
+    const i = (from + k) % S.rows.length;
+    if (callable(i) && !statusOf(i)) return i;
+  }
+  return -1;
 }
-
-// ---------- Phone numbers ----------
+function codes() {
+  if (S.sheetCodes.length) return S.sheetCodes;
+  const seen = S.rows.map((_, i) => statusOf(i)).filter(Boolean);
+  return [...new Set([...DEFAULT_CODES, ...seen])];
+}
+function tone(code) {
+  const i = codes().findIndex(c => c.toLowerCase() === code.toLowerCase());
+  return code ? "tone" + ((i < 0 ? 4 : i) % 5) : "";
+}
 function dialable(raw) {
   let n = (raw || "").replace(/[^\d+]/g, "");
   if (n.startsWith("00")) n = "+" + n.slice(2);
@@ -311,132 +386,210 @@ function dialable(raw) {
   if (n && !n.startsWith("+") && cc) n = (cc.startsWith("+") ? cc : "+" + cc) + n.replace(/^0+/, "");
   return n.replace(/\d/g, "").length > 1 || n.replace(/\D/g, "").length < 6 ? "" : n;
 }
+function saveCols() { cfg.cols[S.key] = S.cols; store.set("dialer:cfg", cfg); }
+function saveEdits() { store.set("dialer:edits:" + S.key, S.edits); }
 
 // ---------- Render ----------
-function fillColumnPickers() {
-  for (const [sel, val] of [[$("nameCol"), S.nameCol], [$("phoneCol"), S.phoneCol]]) {
-    sel.innerHTML = S.headers.map((h, i) => `<option value="${i}">${esc(h || "Column " + (i + 1))}</option>`).join("");
-    sel.value = val;
+function fillPickers() {
+  const used = S.headers.map((h, i) => h || S.rows.some(r => r.cells[i]) ? i : -1).filter(i => i >= 0);
+  const opts = used.map(i => `<option value="${i}">${colLetter(i)} · ${esc(S.headers[i] || "(no header)")}</option>`).join("");
+  const none = `<option value="-1">None</option>`;
+  for (const k of ["name", "phone", "status", "notes"]) {
+    $(k + "Col").innerHTML = (k === "status" || k === "notes" ? none : "") + opts;
+    $(k + "Col").value = S.cols[k];
   }
+  $("tabWrap").hidden = S.mode !== "live" || !S.tabs.length;
+  $("tabSel").innerHTML = S.tabs.map(t => `<option value="${t.gid}">${esc(t.name)}</option>`).join("");
+  $("tabSel").value = cfg.gid;
 }
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const outcomeLabel = id => (OUTCOMES.find(o => o.id === id) || {}).label;
 
 function render() {
-  $("sheetLabel").textContent = S.label;
-  const total = S.rows.length;
-  const done = Object.values(S.results).filter(r => r.outcome).length;
-  const ans = Object.values(S.results).filter(r => r.outcome === "answered").length;
-  $("barFill").style.width = total ? (done / total * 100) + "%" : 0;
-  $("statDone").textContent = `${done} of ${total} called`;
-  $("statAns").textContent = `${ans} answered`;
+  const live = S.mode === "live";
+  $("modeLabel").textContent = live ? `${S.label} · updates the sheet` : S.label;
+  $("modeLabel").classList.toggle("live", live);
+  $("localActions").hidden = live;
 
-  const row = S.rows[S.cur] || [];
-  const r = S.results[S.cur] || {};
-  const num = dialable(row[S.phoneCol]);
-  $("pos").textContent = `${total ? S.cur + 1 : 0} / ${total}`;
-  $("curChip").textContent = r.outcome ? outcomeLabel(r.outcome) : "Not called";
-  $("curChip").className = "chip" + (r.outcome ? " s-" + r.outcome : "");
-  $("curName").textContent = row[S.nameCol] || "(no name)";
-  $("curNum").textContent = row[S.phoneCol] || "No number";
+  const callables = S.rows.map((_, i) => i).filter(callable);
+  const done = callables.filter(i => statusOf(i)).length;
+  $("barFill").style.width = callables.length ? (done / callables.length * 100) + "%" : 0;
+  $("statDone").textContent = `${done} of ${callables.length} have a status`;
+  const mix = {};
+  callables.forEach(i => { const s = statusOf(i); if (s) mix[s] = (mix[s] || 0) + 1; });
+  $("statMix").textContent = Object.entries(mix).sort((a, b) => b[1] - a[1]).map(([s, n]) => `${n} ${s}`).join(" · ");
+
+  const pending = Object.keys(S.edits).length;
+  const failed = Object.values(S.edits).filter(e => e.err).length;
+  $("syncBar").hidden = !live || !failed;
+  $("syncText").textContent = `${pending} change${pending === 1 ? "" : "s"} not saved to the sheet yet`;
+
+  $("card").hidden = S.cur < 0;
+  if (S.cur < 0) { $("pos").textContent = ""; renderQueue(); return; }
+  const row = S.rows[S.cur];
+  const st = statusOf(S.cur);
+  const num = dialable(row.cells[S.cols.phone]);
+  $("pos").textContent = `Row ${row.r}`;
+  $("curChip").textContent = st || "No status";
+  $("curChip").className = "chip " + tone(st);
+  $("curName").textContent = row.cells[S.cols.name] || "(no name)";
+  $("curNum").textContent = row.cells[S.cols.phone] || "No number";
   $("curNum").classList.toggle("invalid", !num);
   $("callBtn").href = num ? "tel:" + num : "#";
   $("callBtn").setAttribute("aria-disabled", num ? "false" : "true");
   $("callLabel").textContent = num ? "Call " + num : "No valid number";
+  const skip = [S.cols.name, S.cols.phone, S.cols.status, S.cols.notes];
   $("fields").innerHTML = S.headers.map((h, i) =>
-    i === S.nameCol || i === S.phoneCol || !row[i] ? "" : `<dt>${esc(h)}</dt><dd>${esc(row[i])}</dd>`).join("");
-  $("outcomes").innerHTML = OUTCOMES.map((o, i) =>
-    `<button data-o="${o.id}" class="${r.outcome === o.id ? "on s-" + o.id : ""}">${o.label}<kbd>${i + 1}</kbd></button>`).join("");
-  if (document.activeElement !== $("notes")) $("notes").value = r.notes || "";
+    skip.includes(i) || !row.cells[i] ? "" : `<dt>${esc(h || colLetter(i))}</dt><dd>${esc(row.cells[i])}</dd>`).join("");
+
+  const noStatusCol = S.cols.status < 0;
+  $("codesSource").textContent = noStatusCol ? "Pick a status column in setup" : S.sheetCodes.length ? "From the sheet's dropdown" : "Default list";
+  $("outcomes").innerHTML = noStatusCol ? "" : codes().map((c, i) =>
+    `<button data-c="${esc(c)}" class="${st.toLowerCase() === c.toLowerCase() ? "on " + tone(c) : ""}">${esc(c)}${i < 9 ? `<kbd>${i + 1}</kbd>` : ""}</button>`).join("");
+
+  $("notesWrap").hidden = S.cols.notes < 0;
+  $("notesWrap").firstChild.textContent = `Notes (${S.headers[S.cols.notes] || "column " + colLetter(S.cols.notes)}) `;
+  if (document.activeElement !== $("notes")) $("notes").value = S.cols.notes >= 0 ? row.cells[S.cols.notes] : "";
+
+  const e = S.edits[row.r];
+  $("saved").className = "saved" + (e && e.err ? " err" : "");
+  $("saved").innerHTML = !live ? (S.mode === "csv" ? "Saved on this device only" : "")
+    : !e ? (st ? "Saved in the sheet" : "")
+    : e.err ? `Not saved: ${esc(e.err)} <button class="link" data-retry>Try again</button>`
+    : "Saving to the sheet…";
   $("prevBtn").disabled = S.cur === 0;
-  $("nextBtn").textContent = S.cur >= total - 1 ? "Last one" : "Skip →";
   renderQueue();
 }
 
 function renderQueue() {
   const only = $("pendingOnly").checked;
   $("queue").innerHTML = S.rows.map((row, i) => {
-    const o = (S.results[i] || {}).outcome;
-    if (only && o && i !== S.cur) return "";
+    const s = statusOf(i);
+    if (!callable(i) || (only && s && i !== S.cur)) return "";
     return `<li class="row${i === S.cur ? " cur" : ""}" data-i="${i}" tabindex="0">
-      <span class="i">${i + 1}</span>
-      <span class="who"><b>${esc(row[S.nameCol] || "(no name)")}</b><span>${esc(row[S.phoneCol] || "—")}</span></span>
-      <span class="chip${o ? " s-" + o : ""}">${o ? outcomeLabel(o) : "To call"}</span></li>`;
-  }).join("");
+      <span class="i">${row.r}</span>
+      <span class="who"><b>${esc(row.cells[S.cols.name] || "(no name)")}</b><span>${esc(row.cells[S.cols.phone])}</span></span>
+      <span class="chip ${tone(s)}">${s ? esc(s) : "To call"}</span></li>`;
+  }).join("") || `<li class="row"><span></span><span class="sub">No rows to show.</span><span></span></li>`;
   const cur = $("queue").querySelector(".cur");
   if (cur) cur.scrollIntoView({ block: "nearest" });
 }
 
-// ---------- Actions ----------
-function go(i) { S.cur = Math.max(0, Math.min(S.rows.length - 1, i)); save(); render(); }
-function nextPending() {
-  for (let k = 1; k <= S.rows.length; k++) {
-    const i = (S.cur + k) % S.rows.length;
-    if (!(S.results[i] || {}).outcome) return go(i);
-  }
-  toast("Every contact has an outcome. Nice work.");
-  render();
-}
-function setOutcome(id) {
-  const r = S.results[S.cur] = S.results[S.cur] || {};
-  r.outcome = r.outcome === id ? undefined : id;
-  r.notes = $("notes").value;
-  if (r.outcome && !r.at) r.at = new Date().toISOString();
-  save();
-  if (r.outcome) setTimeout(nextPending, 250); else render();
-  render();
-}
-function resultRows() {
-  const head = [...S.headers, "Outcome", "Notes", "Called at"];
-  return [head, ...S.rows.map((row, i) => {
-    const r = S.results[i] || {};
-    return [...row, r.outcome ? outcomeLabel(r.outcome) : "", r.notes || "", r.at ? new Date(r.at).toLocaleString() : ""];
-  })];
-}
-function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2200); }
-function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = "msg" + (ok ? " ok" : ""); $("setup").open = true; }
-async function copy(text, done) {
-  try { await navigator.clipboard.writeText(text); toast(done); }
-  catch { toast("Copy was blocked. Use Download CSV instead."); }
+// ---------- Changes ----------
+function edit(i, field, value) {
+  const row = S.rows[i];
+  const col = field === "status" ? S.cols.status : S.cols.notes;
+  if (col < 0) return;
+  row.cells[col] = value;
+  const e = S.edits[row.r] = S.edits[row.r] || { phone: row.cells[S.cols.phone] };
+  e[field] = value;
+  delete e.err;
+  if (S.mode === "sample") delete S.edits[row.r];
+  saveEdits();
+  pushEdits();
 }
 
-$("loadBtn").onclick = loadSheet;
-$("sheetUrl").addEventListener("keydown", e => { if (e.key === "Enter") loadSheet(); });
-$("nameCol").onchange = e => { S.nameCol = +e.target.value; save(); render(); };
-$("phoneCol").onchange = e => { S.phoneCol = +e.target.value; save(); render(); };
-$("cc").oninput = e => { store.set("dialer:cc", e.target.value); render(); };
-$("outcomes").onclick = e => { const b = e.target.closest("button"); if (b) setOutcome(b.dataset.o); };
-$("notes").oninput = e => { (S.results[S.cur] = S.results[S.cur] || {}).notes = e.target.value; save(); };
+async function pushEdits() {
+  if (S.mode !== "live") return;
+  for (const [r, e] of Object.entries(S.edits)) {
+    if (sending.has(r)) continue;
+    sending.add(r);
+    const cells = [];
+    if ("status" in e) cells.push({ col: S.cols.status + 1, value: e.status });
+    if ("notes" in e && S.cols.notes >= 0) cells.push({ col: S.cols.notes + 1, value: e.notes });
+    const sent = JSON.stringify(e);
+    try {
+      const res = await fetch(cfg.scriptUrl, {
+        method: "POST",
+        body: JSON.stringify({ gid: cfg.gid, row: +r, phoneCol: S.cols.phone + 1, phone: e.phone, cells }),
+      });
+      const out = await res.json();
+      if (!out.ok) throw new Error(out.error || "the sheet refused the change");
+      // Only clear it if nothing changed on this row while the request was out
+      if (JSON.stringify(S.edits[r]) === sent) delete S.edits[r];
+    } catch (err) {
+      if (S.edits[r]) S.edits[r].err = err.message && !/fetch|network/i.test(err.message) ? err.message : "no connection";
+    }
+    sending.delete(r);
+    saveEdits();
+    render();
+    if (S.edits[r] && !S.edits[r].err && JSON.stringify(S.edits[r]) !== sent) pushEdits();
+  }
+}
+
+function go(i) { if (i >= 0 && i < S.rows.length) { S.cur = i; render(); } }
+function setStatus(code) {
+  const i = S.cur;
+  const next = statusOf(i).toLowerCase() === code.toLowerCase() ? "" : code;
+  if (S.cols.notes >= 0 && $("notes").value !== S.rows[i].cells[S.cols.notes]) edit(i, "notes", $("notes").value);
+  edit(i, "status", next);
+  if (!next) return render();
+  render();
+  setTimeout(() => {
+    const n = firstBlank(i + 1);
+    if (n < 0) { toast("Every number on this tab has a status."); S.cur = i; }
+    else S.cur = n;
+    render();
+  }, 300);
+}
+
+function resultRows() {
+  return [S.headers, ...S.rows.map(r => r.cells)];
+}
+function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2400); }
+function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = "msg" + (ok ? " ok" : ""); if (!ok) $("setup").open = true; }
+async function copy(text, done) {
+  try { await navigator.clipboard.writeText(text); toast(done); }
+  catch { toast("Copy was blocked. Select the text and copy it instead."); }
+}
+
+// ---------- Wiring ----------
+$("loadBtn").onclick = load;
+$("refreshBtn").onclick = () => S.mode === "sample" ? load() : S.mode === "live" ? loadLive() : load();
+for (const k of ["name", "phone", "status", "notes"]) {
+  $(k + "Col").onchange = e => {
+    S.cols[k] = +e.target.value; saveCols();
+    if (k === "status" && S.mode === "live") return loadLive(S.cols.status);
+    if (k === "status") S.cur = firstBlank(0);
+    render();
+  };
+}
+$("tabSel").onchange = e => { cfg.gid = e.target.value; store.set("dialer:cfg", cfg); loadLive(); };
+$("cc").oninput = e => { cfg.cc = e.target.value; store.set("dialer:cfg", cfg); render(); };
+$("outcomes").onclick = e => { const b = e.target.closest("button"); if (b) setStatus(b.dataset.c); };
+$("notes").onchange = e => edit(S.cur, "notes", e.target.value);
+$("saved").onclick = e => { if (e.target.closest("[data-retry]")) pushEdits(); };
+$("retryBtn").onclick = pushEdits;
+window.addEventListener("online", pushEdits);
 $("prevBtn").onclick = () => go(S.cur - 1);
-$("nextBtn").onclick = () => go(S.cur + 1);
-$("copyNumBtn").onclick = () => copy(dialable(S.rows[S.cur][S.phoneCol]) || S.rows[S.cur][S.phoneCol], "Number copied");
-$("callBtn").onclick = () => { const r = S.results[S.cur] = S.results[S.cur] || {}; r.at = new Date().toISOString(); save(); };
-$("queue").onclick = e => { const li = e.target.closest(".row"); if (li) go(+li.dataset.i); };
-$("queue").onkeydown = e => { const li = e.target.closest(".row"); if (li && e.key === "Enter") go(+li.dataset.i); };
+$("nextBtn").onclick = () => go(S.cur + 1 < S.rows.length ? S.cur + 1 : S.cur);
+$("copyNumBtn").onclick = () => { const raw = S.rows[S.cur].cells[S.cols.phone]; copy(dialable(raw) || raw, "Number copied"); };
+$("queue").onclick = e => { const li = e.target.closest(".row[data-i]"); if (li) go(+li.dataset.i); };
+$("queue").onkeydown = e => { const li = e.target.closest(".row[data-i]"); if (li && e.key === "Enter") go(+li.dataset.i); };
 $("pendingOnly").onchange = renderQueue;
-$("copyResults").onclick = () => copy(resultRows().map(r => r.map(c => String(c).replace(/[\t\n]/g, " ")).join("\t")).join("\n"), "Results copied. Paste into a new sheet tab.");
+$("copyResults").onclick = () => copy(resultRows().map(r => r.map(c => String(c).replace(/[\t\n]/g, " ")).join("\t")).join("\n"), "Copied. Paste over the sheet's rows.");
 $("dlResults").onclick = () => {
   const blob = new Blob([resultRows().map(r => r.map(csvCell).join(",")).join("\r\n")], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = "call-results.csv"; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
-$("resetBtn").onclick = () => $("resetConfirm").hidden = false;
-$("resetNo").onclick = () => $("resetConfirm").hidden = true;
-$("resetYes").onclick = () => { S.results = {}; S.cur = 0; save(); $("resetConfirm").hidden = true; render(); toast("Outcomes cleared"); };
+$("copyScript").onclick = () => copy($("scriptText").textContent, "Script copied");
 document.addEventListener("keydown", e => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   const n = +e.key;
-  if (n >= 1 && n <= OUTCOMES.length) setOutcome(OUTCOMES[n - 1].id);
-  else if (e.key === "ArrowRight") go(S.cur + 1);
+  if (n >= 1 && n <= 9 && codes()[n - 1] && S.cols.status >= 0) setStatus(codes()[n - 1]);
+  else if (e.key === "ArrowRight") $("nextBtn").click();
   else if (e.key === "ArrowLeft") go(S.cur - 1);
 });
 
 // ---------- Start ----------
-$("cc").value = store.get("dialer:cc", "");
-const lastUrl = store.get("dialer:lastUrl", "");
-setData("sample", "Sample list", parseCSV(SAMPLE));
-if (lastUrl) { $("sheetUrl").value = lastUrl; loadSheet(); } else $("setup").open = true;
+fetch("apps-script.gs").then(r => r.ok ? r.text() : Promise.reject())
+  .then(t => $("scriptText").textContent = t)
+  .catch(() => $("scriptText").textContent = "Couldn't load the script. Get it from github.com/aravintp/sheet-dialer (apps-script.gs).");
+$("scriptUrl").value = cfg.scriptUrl || "";
+$("sheetUrl").value = cfg.sheetUrl || "";
+$("cc").value = cfg.cc || "";
+setData("sample", "sample", "Sample list", parseCSV(SAMPLE), []);
+if (cfg.scriptUrl || cfg.sheetUrl) load(); else $("setup").open = true;
 </script>
 </body>
 </html>
