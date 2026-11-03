@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sheet Dialer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow column — sheet bar, the current contact as the main card, then the queue. Built for a phone held in one hand. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --fg: #16201c;
+  --muted: #5d6b65;
+  --line: #d9e0dc;
+  --accent: #0f7a55;
+  --accent-fg: #ffffff;
+  --accent-soft: #dff1e9;
+  --ok: #0f7a55; --ok-soft: #dff1e9;
+  --warn: #9a5b00; --warn-soft: #fbeed6;
+  --bad: #b3261e; --bad-soft: #fbe3e1;
+  --info: #2f5aa8; --info-soft: #e1e9f8;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1513; --surface: #18201d; --fg: #e6ece9; --muted: #95a39d; --line: #2a3531;
+    --accent: #3fc28f; --accent-fg: #062118; --accent-soft: #173a2d;
+    --ok: #3fc28f; --ok-soft: #173a2d; --warn: #e9a945; --warn-soft: #3a2d14;
+    --bad: #f0857c; --bad-soft: #3d1d1b; --info: #8fb0ef; --info-soft: #1d2a42;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #18201d; --fg: #e6ece9; --muted: #95a39d; --line: #2a3531;
+  --accent: #3fc28f; --accent-fg: #062118; --accent-soft: #173a2d;
+  --ok: #3fc28f; --ok-soft: #173a2d; --warn: #e9a945; --warn-soft: #3a2d14;
+  --bad: #f0857c; --bad-soft: #3d1d1b; --info: #8fb0ef; --info-soft: #1d2a42;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--bg); }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+[hidden] { display: none !important; }
+.wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font: 700 1.6rem/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; }
+h2 { font: 600 0.75rem/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sub { color: var(--muted); font-size: 0.875rem; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+label { font-size: 0.8rem; font-weight: 600; color: var(--muted); display: grid; gap: 4px; }
+input, select, textarea {
+  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; width: 100%; min-width: 0;
+}
+textarea { resize: vertical; min-height: 64px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .row:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.inline { display: flex; gap: 8px; flex-wrap: wrap; }
+.inline > input { flex: 1 1 200px; }
+
+button {
+  font: 600 0.9rem/1 var(--font-body); border-radius: 8px; padding: 11px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.link { background: none; border: none; color: var(--accent); padding: 4px 0; }
+.msg { font-size: 0.85rem; color: var(--bad); }
+.msg.ok { color: var(--muted); }
+
+/* progress */
+.progress { display: grid; gap: 6px; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+.stats { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* current contact */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -12px rgba(0,0,0,.12); }
+.pos { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.name { font: 700 1.5rem/1.15 var(--font-display); margin: 0; overflow-wrap: anywhere; }
+.number { font: 500 1.35rem/1.2 var(--font-num); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; user-select: all; overflow-wrap: anywhere; }
+.number.invalid { color: var(--bad); }
+.fields { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 0.875rem; }
+.fields dt { color: var(--muted); }
+.fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.call {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--accent); color: var(--accent-fg); text-decoration: none;
+  font: 700 1.1rem/1 var(--font-display); padding: 18px; border-radius: 12px;
+}
+.call svg { width: 22px; height: 22px; }
+.call[aria-disabled="true"] { opacity: .4; pointer-events: none; }
+.outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.outcomes button { padding: 12px 6px; font-size: 0.85rem; }
+.outcomes button kbd { font: 500 0.7rem var(--font-num); color: var(--muted); margin-left: 4px; }
+.outcomes button.on { border-width: 2px; }
+.nav { display: flex; justify-content: space-between; gap: 8px; }
+.nav button { flex: 1; }
+
+/* status chips */
+.chip { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; white-space: nowrap; background: var(--bg); color: var(--muted); }
+.s-answered { background: var(--ok-soft); color: var(--ok); border-color: var(--ok) !important; }
+.s-noanswer, .s-busy { background: var(--warn-soft); color: var(--warn); border-color: var(--warn) !important; }
+.s-voicemail, .s-callback { background: var(--info-soft); color: var(--info); border-color: var(--info) !important; }
+.s-wrong { background: var(--bad-soft); color: var(--bad); border-color: var(--bad) !important; }
+
+/* queue */
+.qhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qhead label { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.qhead input { width: auto; }
+.queue { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); max-height: 360px; overflow-y: auto; }
+.row { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.row:last-child { border-bottom: none; }
+.row.cur { background: var(--accent-soft); }
+.row .i { color: var(--muted); font: 500 0.8rem var(--font-num); }
+.row .who { min-width: 0; }
+.row .who b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .who span { font: 500 0.8rem var(--font-num); color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; }
+@media (max-width: 380px) { .outcomes { grid-template-columns: repeat(2, 1fr); } .row2 { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sheet Dialer</h1>
+    <span class="sub" id="sheetLabel">Sample list</span>
+  </header>
+
+  <details class="panel" id="setup">
+    <summary><strong>Connect a Google Sheet</strong></summary>
+    <p class="sub" style="margin:0">In Google Sheets, click <b>Share</b> → <b>General access</b> → <b>Anyone with the link</b> (Viewer). Then paste the link here. The tab open in the link is the one that loads.</p>
+    <div class="inline">
+      <input id="sheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
+      <button class="primary" id="loadBtn">Load sheet</button>
+    </div>
+    <div class="row2">
+      <label>Name column <select id="nameCol"></select></label>
+      <label>Phone column <select id="phoneCol"></select></label>
+    </div>
+    <label>Country code for numbers without one (optional)
+      <input id="cc" placeholder="e.g. +1 or +91" inputmode="tel">
+    </label>
+    <div class="msg ok" id="msg"></div>
+  </details>
+
+  <div class="progress">
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="stats"><span id="statDone">0 of 0 called</span><span id="statAns">0 answered</span></div>
+  </div>
+
+  <section class="card" id="card">
+    <div class="pos"><span id="pos">1 / 1</span><span class="chip" id="curChip">Not called</span></div>
+    <div>
+      <p class="name" id="curName">—</p>
+      <div class="number" id="curNum">—</div>
+    </div>
+    <a class="call" id="callBtn" href="#">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1L6.6 10.8z"/></svg>
+      <span id="callLabel">Call</span>
+    </a>
+    <dl class="fields" id="fields"></dl>
+    <div>
+      <h2 style="margin-bottom:8px">How did it go?</h2>
+      <div class="outcomes" id="outcomes"></div>
+    </div>
+    <label>Notes <textarea id="notes" placeholder="Anything to remember about this call"></textarea></label>
+    <div class="nav">
+      <button id="prevBtn">← Back</button>
+      <button id="copyNumBtn">Copy number</button>
+      <button id="nextBtn">Skip →</button>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:10px">
+    <div class="qhead">
+      <h2>Call list</h2>
+      <label><input type="checkbox" id="pendingOnly"> Only not called</label>
+    </div>
+    <ul class="queue" id="queue"></ul>
+    <div class="actions">
+      <button id="copyResults">Copy results for Sheets</button>
+      <button id="dlResults">Download CSV</button>
+      <button class="link" id="resetBtn">Clear outcomes</button>
+    </div>
+    <p class="sub" id="resetConfirm" hidden>Clear every outcome and note for this sheet? <button class="link" id="resetYes">Yes, clear</button> · <button class="link" id="resetNo">Keep</button></p>
+    <p class="sub" style="margin:0">Progress is saved on this device. "Copy results" gives you the original columns plus Outcome, Notes and Called at — paste it into a new tab in your sheet.</p>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const OUTCOMES = [
+  { id: "answered",  label: "Answered" },
+  { id: "noanswer",  label: "No answer" },
+  { id: "busy",      label: "Busy" },
+  { id: "voicemail", label: "Voicemail" },
+  { id: "callback",  label: "Call back" },
+  { id: "wrong",     label: "Wrong no." },
+];
+const SAMPLE = `Name,Phone,Company,City
+Example: Priya Raman,+1 415 555 0132,Lumen Labs,San Francisco
+Example: Marcus Hale,(212) 555-0187,Hale & Ortiz,New York
+Example: Sofia Delgado,+1 312 555 0144,Northwind Freight,Chicago
+Example: Ken Watanabe,206-555-0119,Cedar Dental,Seattle
+Example: Amara Okafor,+1 512 555 0168,Brightside Realty,Austin`;
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+let S = { key: "sample", label: "Sample list", headers: [], rows: [], nameCol: 0, phoneCol: 1, cur: 0, results: {} };
+
+// ---------- CSV ----------
+function parseCSV(text) {
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(f); rows.push(row); row = []; f = "";
+    } else f += c;
+  }
+  if (f !== "" || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ""));
+}
+const csvCell = v => /[",\n\r]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
+
+// ---------- Sheet URL ----------
+function parseSheetUrl(url) {
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (!m) return null;
+  const g = url.match(/[#&?]gid=(\d+)/);
+  return { id: m[1], gid: g ? g[1] : "0" };
+}
+
+async function loadSheet() {
+  const url = $("sheetUrl").value.trim();
+  const p = parseSheetUrl(url);
+  if (!p) return showMsg("That doesn't look like a Google Sheets link. It should contain /spreadsheets/d/…");
+  showMsg("Loading…", true);
+  const src = `https://docs.google.com/spreadsheets/d/${p.id}/gviz/tq?tqx=out:csv&headers=1&gid=${p.gid}`;
+  try {
+    const res = await fetch(src);
+    const text = await res.text();
+    if (!res.ok || /^\s*<!DOCTYPE|<html/i.test(text)) throw new Error("private");
+    const rows = parseCSV(text);
+    if (rows.length < 2) return showMsg("The sheet loaded but has no rows under the header.");
+    setData(`${p.id}:${p.gid}`, "Google Sheet", rows);
+    store.set("dialer:lastUrl", url);
+    showMsg(`Loaded ${rows.length - 1} contacts.`, true);
+    $("setup").open = false;
+  } catch (e) {
+    // A private sheet redirects to Google sign-in, which shows up here as a network error
+    showMsg("Couldn't read the sheet. Check that sharing is set to \"Anyone with the link\" and that you're online.");
+  }
+}
+
+function setData(key, label, rows) {
+  // Google pads exports with empty columns; keep only columns that have a header or any value
+  const keep = rows[0].map((_, i) => i).filter(i => rows.some(r => (r[i] || "").trim()));
+  rows = rows.map(r => keep.map(i => r[i] || ""));
+  const headers = rows[0].map(h => h.trim());
+  const saved = store.get("dialer:" + key, {});
+  const guess = (re, fb) => { const i = headers.findIndex(h => re.test(h)); return i >= 0 ? i : fb; };
+  S = {
+    key, label, headers,
+    rows: rows.slice(1).map(r => headers.map((_, i) => (r[i] || "").trim())),
+    nameCol: saved.nameCol ?? guess(/name|contact|customer|lead/i, 0),
+    phoneCol: saved.phoneCol ?? guess(/phone|mobile|cell|number|tel|whatsapp/i, Math.min(1, headers.length - 1)),
+    cur: saved.cur ?? 0,
+    results: saved.results ?? {},
+  };
+  if (S.cur >= S.rows.length) S.cur = 0;
+  fillColumnPickers();
+  render();
+}
+
+function save() {
+  store.set("dialer:" + S.key, { nameCol: S.nameCol, phoneCol: S.phoneCol, cur: S.cur, results: S.results });
+}
+
+// ---------- Phone numbers ----------
+function dialable(raw) {
+  let n = (raw || "").replace(/[^\d+]/g, "");
+  if (n.startsWith("00")) n = "+" + n.slice(2);
+  const cc = $("cc").value.replace(/[^\d+]/g, "");
+  if (n && !n.startsWith("+") && cc) n = (cc.startsWith("+") ? cc : "+" + cc) + n.replace(/^0+/, "");
+  return n.replace(/\d/g, "").length > 1 || n.replace(/\D/g, "").length < 6 ? "" : n;
+}
+
+// ---------- Render ----------
+function fillColumnPickers() {
+  for (const [sel, val] of [[$("nameCol"), S.nameCol], [$("phoneCol"), S.phoneCol]]) {
+    sel.innerHTML = S.headers.map((h, i) => `<option value="${i}">${esc(h || "Column " + (i + 1))}</option>`).join("");
+    sel.value = val;
+  }
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const outcomeLabel = id => (OUTCOMES.find(o => o.id === id) || {}).label;
+
+function render() {
+  $("sheetLabel").textContent = S.label;
+  const total = S.rows.length;
+  const done = Object.values(S.results).filter(r => r.outcome).length;
+  const ans = Object.values(S.results).filter(r => r.outcome === "answered").length;
+  $("barFill").style.width = total ? (done / total * 100) + "%" : 0;
+  $("statDone").textContent = `${done} of ${total} called`;
+  $("statAns").textContent = `${ans} answered`;
+
+  const row = S.rows[S.cur] || [];
+  const r = S.results[S.cur] || {};
+  const num = dialable(row[S.phoneCol]);
+  $("pos").textContent = `${total ? S.cur + 1 : 0} / ${total}`;
+  $("curChip").textContent = r.outcome ? outcomeLabel(r.outcome) : "Not called";
+  $("curChip").className = "chip" + (r.outcome ? " s-" + r.outcome : "");
+  $("curName").textContent = row[S.nameCol] || "(no name)";
+  $("curNum").textContent = row[S.phoneCol] || "No number";
+  $("curNum").classList.toggle("invalid", !num);
+  $("callBtn").href = num ? "tel:" + num : "#";
+  $("callBtn").setAttribute("aria-disabled", num ? "false" : "true");
+  $("callLabel").textContent = num ? "Call " + num : "No valid number";
+  $("fields").innerHTML = S.headers.map((h, i) =>
+    i === S.nameCol || i === S.phoneCol || !row[i] ? "" : `<dt>${esc(h)}</dt><dd>${esc(row[i])}</dd>`).join("");
+  $("outcomes").innerHTML = OUTCOMES.map((o, i) =>
+    `<button data-o="${o.id}" class="${r.outcome === o.id ? "on s-" + o.id : ""}">${o.label}<kbd>${i + 1}</kbd></button>`).join("");
+  if (document.activeElement !== $("notes")) $("notes").value = r.notes || "";
+  $("prevBtn").disabled = S.cur === 0;
+  $("nextBtn").textContent = S.cur >= total - 1 ? "Last one" : "Skip →";
+  renderQueue();
+}
+
+function renderQueue() {
+  const only = $("pendingOnly").checked;
+  $("queue").innerHTML = S.rows.map((row, i) => {
+    const o = (S.results[i] || {}).outcome;
+    if (only && o && i !== S.cur) return "";
+    return `<li class="row${i === S.cur ? " cur" : ""}" data-i="${i}" tabindex="0">
+      <span class="i">${i + 1}</span>
+      <span class="who"><b>${esc(row[S.nameCol] || "(no name)")}</b><span>${esc(row[S.phoneCol] || "—")}</span></span>
+      <span class="chip${o ? " s-" + o : ""}">${o ? outcomeLabel(o) : "To call"}</span></li>`;
+  }).join("");
+  const cur = $("queue").querySelector(".cur");
+  if (cur) cur.scrollIntoView({ block: "nearest" });
+}
+
+// ---------- Actions ----------
+function go(i) { S.cur = Math.max(0, Math.min(S.rows.length - 1, i)); save(); render(); }
+function nextPending() {
+  for (let k = 1; k <= S.rows.length; k++) {
+    const i = (S.cur + k) % S.rows.length;
+    if (!(S.results[i] || {}).outcome) return go(i);
+  }
+  toast("Every contact has an outcome. Nice work.");
+  render();
+}
+function setOutcome(id) {
+  const r = S.results[S.cur] = S.results[S.cur] || {};
+  r.outcome = r.outcome === id ? undefined : id;
+  r.notes = $("notes").value;
+  if (r.outcome && !r.at) r.at = new Date().toISOString();
+  save();
+  if (r.outcome) setTimeout(nextPending, 250); else render();
+  render();
+}
+function resultRows() {
+  const head = [...S.headers, "Outcome", "Notes", "Called at"];
+  return [head, ...S.rows.map((row, i) => {
+    const r = S.results[i] || {};
+    return [...row, r.outcome ? outcomeLabel(r.outcome) : "", r.notes || "", r.at ? new Date(r.at).toLocaleString() : ""];
+  })];
+}
+function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2200); }
+function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = "msg" + (ok ? " ok" : ""); $("setup").open = true; }
+async function copy(text, done) {
+  try { await navigator.clipboard.writeText(text); toast(done); }
+  catch { toast("Copy was blocked. Use Download CSV instead."); }
+}
+
+$("loadBtn").onclick = loadSheet;
+$("sheetUrl").addEventListener("keydown", e => { if (e.key === "Enter") loadSheet(); });
+$("nameCol").onchange = e => { S.nameCol = +e.target.value; save(); render(); };
+$("phoneCol").onchange = e => { S.phoneCol = +e.target.value; save(); render(); };
+$("cc").oninput = e => { store.set("dialer:cc", e.target.value); render(); };
+$("outcomes").onclick = e => { const b = e.target.closest("button"); if (b) setOutcome(b.dataset.o); };
+$("notes").oninput = e => { (S.results[S.cur] = S.results[S.cur] || {}).notes = e.target.value; save(); };
+$("prevBtn").onclick = () => go(S.cur - 1);
+$("nextBtn").onclick = () => go(S.cur + 1);
+$("copyNumBtn").onclick = () => copy(dialable(S.rows[S.cur][S.phoneCol]) || S.rows[S.cur][S.phoneCol], "Number copied");
+$("callBtn").onclick = () => { const r = S.results[S.cur] = S.results[S.cur] || {}; r.at = new Date().toISOString(); save(); };
+$("queue").onclick = e => { const li = e.target.closest(".row"); if (li) go(+li.dataset.i); };
+$("queue").onkeydown = e => { const li = e.target.closest(".row"); if (li && e.key === "Enter") go(+li.dataset.i); };
+$("pendingOnly").onchange = renderQueue;
+$("copyResults").onclick = () => copy(resultRows().map(r => r.map(c => String(c).replace(/[\t\n]/g, " ")).join("\t")).join("\n"), "Results copied. Paste into a new sheet tab.");
+$("dlResults").onclick = () => {
+  const blob = new Blob([resultRows().map(r => r.map(csvCell).join(",")).join("\r\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "call-results.csv"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("resetBtn").onclick = () => $("resetConfirm").hidden = false;
+$("resetNo").onclick = () => $("resetConfirm").hidden = true;
+$("resetYes").onclick = () => { S.results = {}; S.cur = 0; save(); $("resetConfirm").hidden = true; render(); toast("Outcomes cleared"); };
+document.addEventListener("keydown", e => {
+  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  const n = +e.key;
+  if (n >= 1 && n <= OUTCOMES.length) setOutcome(OUTCOMES[n - 1].id);
+  else if (e.key === "ArrowRight") go(S.cur + 1);
+  else if (e.key === "ArrowLeft") go(S.cur - 1);
+});
+
+// ---------- Start ----------
+$("cc").value = store.get("dialer:cc", "");
+const lastUrl = store.get("dialer:lastUrl", "");
+setData("sample", "Sample list", parseCSV(SAMPLE));
+if (lastUrl) { $("sheetUrl").value = lastUrl; loadSheet(); } else $("setup").open = true;
+</script>
+</body>
+</html>
