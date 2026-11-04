@@ -382,6 +382,8 @@ function tone(code) {
 function dialable(raw) {
   let n = (raw || "").replace(/[^\d+]/g, "");
   if (n.startsWith("00")) n = "+" + n.slice(2);
+  // 10+ digits without a leading 0 (6591234567, 60123456789) already has its country code, just not the +
+  if (/^[1-9]\d{9,}$/.test(n)) n = "+" + n;
   const cc = $("cc").value.replace(/[^\d+]/g, "");
   if (n && !n.startsWith("+") && cc) n = (cc.startsWith("+") ? cc : "+" + cc) + n.replace(/^0+/, "");
   return n.replace(/\d/g, "").length > 1 || n.replace(/\D/g, "").length < 6 ? "" : n;
