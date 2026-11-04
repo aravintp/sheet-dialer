@@ -584,6 +584,25 @@ document.addEventListener("keydown", e => {
 });
 
 // ---------- Start ----------
+// A setup link like …/sheet-dialer/#s=AKfycb…&gid=932045619&cc=65 fills in the settings.
+// s takes the script's ID or full URL, sheet a full Google Sheet link. It sits after # so
+// it never reaches the web server, and is removed from the address bar once saved.
+function readSetupLink() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (!p.has("s") && !p.has("sheet") && !p.has("gid")) return;
+  const s = p.get("s");
+  if (s) cfg.scriptUrl = s.startsWith("https://") ? s : `https://script.google.com/macros/s/${s}/exec`;
+  if (p.has("sheet")) cfg.sheetUrl = p.get("sheet");
+  const fromLink = parseSheetUrl(cfg.sheetUrl);
+  if (p.has("gid")) cfg.gid = p.get("gid");
+  else if (fromLink && fromLink.gid) cfg.gid = fromLink.gid;
+  cfg.linkGid = fromLink && fromLink.gid;
+  if (p.has("cc")) cfg.cc = "+" + p.get("cc").replace(/\D/g, "");
+  store.set("dialer:cfg", cfg);
+  history.replaceState(null, "", location.pathname + location.search);
+  toast("Setup saved from your link");
+}
+readSetupLink();
 fetch("apps-script.gs").then(r => r.ok ? r.text() : Promise.reject())
   .then(t => $("scriptText").textContent = t)
   .catch(() => $("scriptText").textContent = "Couldn't load the script. Get it from github.com/aravintp/sheet-dialer (apps-script.gs).");
