@@ -144,7 +144,23 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .row .who span { font: 500 0.8rem var(--font-num); color: var(--muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; max-width: calc(100vw - 32px); }
-@media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } }
+/* Zoom Phone: the softphone sits beside the list on wide screens, under the contact card on phones */
+.phone { display: grid; gap: 8px; }
+.phone iframe { width: 100%; min-width: 350px; height: 580px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.callbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.875rem; padding: 10px 12px; border-radius: 8px; background: var(--bg); }
+.callbar.ringing { background: var(--t1-soft); color: var(--t1); }
+.callbar.connected { background: var(--t0-soft); color: var(--t0); }
+.callbar.wait { background: var(--t2-soft); color: var(--t2); }
+.callbar button { padding: 6px 10px; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--fg); }
+.check input { width: auto; }
+.zlog { margin: 0; max-height: 120px; overflow: auto; font: 500 0.7rem/1.5 var(--font-num); color: var(--muted); white-space: pre-wrap; }
+@media (min-width: 1000px) {
+  body.zoom .wrap { max-width: 980px; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 24px; }
+  body.zoom .wrap > * { grid-column: 1; }
+  body.zoom .wrap > .phone { grid-column: 2; grid-row: 1 / span 20; align-self: start; position: sticky; top: 16px; }
+}
+@media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } .phone iframe { min-width: 0; } }
 @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
 </style>
 </head>
@@ -179,6 +195,16 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
       <input id="cc" placeholder="e.g. +65" inputmode="tel">
     </label>
     <div class="help">
+      <strong>Zoom Phone</strong>
+      <label class="check"><input type="checkbox" id="zoomOn"> Call through Zoom Phone in this page</label>
+      <span class="sub">The Zoom Phone dialer appears on this page and tells the app when a call is ringing, answered or ended. Your Zoom admin needs to install the Zoom Phone Smart Embed app, add this site's address to its approved domains, and turn on "Automatically Call From Third Party Apps" under Account Settings → Zoom Phone.</span>
+      <div id="zoomOpts" class="grid2">
+        <label class="check" style="grid-column:1/-1"><input type="checkbox" id="autoDial"> Auto-dial the next number</label>
+        <label>Status for unanswered calls <select id="noAnswerCode"></select></label>
+        <label>Seconds before the next call <input id="gapSec" type="number" min="1" max="60" inputmode="numeric"></label>
+      </div>
+    </div>
+    <div class="help">
       <strong>Turn on sheet updates (one time)</strong>
       <span class="sub">With this on, the app reads your tabs and the Status dropdown, and every status you tap is written straight into the sheet. Without it, paste only the Google Sheet link: the app can read a sheet shared as "Anyone with the link", but statuses stay on this device.</span>
       <ol>
@@ -209,6 +235,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1L6.6 10.8z"/></svg>
       <span id="callLabel">Call</span>
     </a>
+    <div class="callbar" id="callBar" hidden><span id="callText"></span><button id="callAct"></button></div>
     <dl class="fields" id="fields"></dl>
     <div>
       <div class="statushead"><h2>Status</h2><span class="sub" id="codesSource"></span></div>
@@ -222,6 +249,12 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
       <button id="nextBtn">Skip →</button>
     </div>
   </section>
+
+  <aside class="phone" id="phone" hidden>
+    <h2>Zoom Phone</h2>
+    <div id="phoneSlot"></div>
+    <details><summary class="sub">Call events from Zoom</summary><pre class="zlog" id="zlog">None yet.</pre></details>
+  </aside>
 
   <section style="display:grid;gap:10px">
     <div class="qhead">
@@ -403,6 +436,14 @@ function fillPickers() {
   $("tabWrap").hidden = S.mode !== "live" || !S.tabs.length;
   $("tabSel").innerHTML = S.tabs.map(t => `<option value="${t.gid}">${esc(t.name)}</option>`).join("");
   $("tabSel").value = cfg.gid;
+  fillNoAnswer();
+}
+function fillNoAnswer() {
+  const list = codes();
+  if (cfg.noAnswer === undefined) cfg.noAnswer = list.find(c => /^npu$|no answer|not picked|unanswered/i.test(c)) || "";
+  $("noAnswerCode").innerHTML = `<option value="">Leave blank</option>` +
+    [...new Set([...list, cfg.noAnswer].filter(Boolean))].map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  $("noAnswerCode").value = cfg.noAnswer;
 }
 
 function render() {
@@ -459,6 +500,7 @@ function render() {
     : "Saving to the sheet…";
   $("prevBtn").disabled = S.cur === 0;
   renderQueue();
+  renderCall();
 }
 
 function renderQueue() {
@@ -517,21 +559,143 @@ async function pushEdits() {
   }
 }
 
-function go(i) { if (i >= 0 && i < S.rows.length) { S.cur = i; render(); } }
-function setStatus(code) {
-  const i = S.cur;
+function go(i) { if (i >= 0 && i < S.rows.length) { cancelWait(); S.cur = i; render(); } }
+function setStatus(code, i = S.cur) {
   const next = statusOf(i).toLowerCase() === code.toLowerCase() ? "" : code;
-  if (S.cols.notes >= 0 && $("notes").value !== S.rows[i].cells[S.cols.notes]) edit(i, "notes", $("notes").value);
+  if (i === S.cur && S.cols.notes >= 0 && $("notes").value !== S.rows[i].cells[S.cols.notes]) edit(i, "notes", $("notes").value);
   edit(i, "status", next);
   if (!next) return render();
   render();
-  setTimeout(() => {
-    const n = firstBlank(i + 1);
-    if (n < 0) { toast("Every number on this tab has a status."); S.cur = i; }
-    else S.cur = n;
-    render();
-  }, 300);
+  // Only move on if the caller is still looking at this row
+  setTimeout(() => S.cur === i ? advanceFrom(i) : scheduleAutoDial(), 300);
 }
+function advanceFrom(i) {
+  const n = firstBlank(i + 1);
+  if (n < 0) { toast("Every number on this tab has a status."); S.cur = i; render(); return; }
+  S.cur = n;
+  render();
+  scheduleAutoDial();
+}
+
+// ---------- Zoom Phone (Smart Embed) ----------
+// The Zoom dialer runs in an iframe. We ask it to call with postMessage and it posts back
+// zp-call-ringing-event / zp-call-connected-event / zp-call-ended-event. It has no command
+// to hang up, so an unanswered call ends on Zoom's side (ring timeout, voicemail, decline).
+const ZOOM = "https://applications.zoom.us";
+const Z = { frame: null, ready: false, call: null, wait: null, paused: false, log: [] };
+// Z.call: { i, r, number, state: "dialing" | "ringing" | "connected" | "ended", answered, at }
+const digits = n => String(n || "").replace(/\D/g, "");
+const sameNumber = (a, b) => { a = digits(a); b = digits(b); return a.length >= 6 && b.length >= 6 && a.slice(-8) === b.slice(-8); };
+// A call we never hear back about stops blocking new calls after a minute
+const callActive = () => { const c = Z.call; return !!c && c.state !== "ended" && !(c.state === "dialing" && Date.now() - c.at > 60000); };
+
+function mountPhone() {
+  document.body.classList.toggle("zoom", !!cfg.zoom);
+  $("phone").hidden = !cfg.zoom;
+  $("zoomOpts").hidden = !cfg.zoom;
+  if (!cfg.zoom) {
+    if (Z.frame) Z.frame.remove();
+    Object.assign(Z, { frame: null, ready: false, call: null, paused: false });
+    cancelWait();
+    return renderCall();
+  }
+  if (Z.frame) return;
+  const f = document.createElement("iframe");
+  f.id = "zoom-embeddable-phone-iframe";
+  f.src = ZOOM + "/integration/phone/embeddablephone/home";
+  f.allow = "microphone; autoplay; clipboard-read; clipboard-write " + ZOOM;
+  f.title = "Zoom Phone";
+  // Calls sent straight after load can fail with "no available caller id", so give it a moment
+  f.onload = () => setTimeout(() => { Z.ready = true; renderCall(); }, 1500);
+  $("phoneSlot").append(f);
+  Z.frame = f;
+  renderCall();
+}
+
+function dial(i) {
+  const row = S.rows[i];
+  const num = row && dialable(row.cells[S.cols.phone]);
+  if (!num) return false;
+  if (!Z.ready) { toast("Zoom Phone is still loading. Sign in to it, then press Call."); return false; }
+  if (callActive()) { toast("A call is still going. End it in Zoom Phone first."); return false; }
+  cancelWait();
+  Z.paused = false;
+  Z.frame.contentWindow.postMessage({ type: "zp-make-call", data: { number: num } }, ZOOM);
+  Z.call = { i, r: row.r, number: num, state: "dialing", answered: false, at: Date.now() };
+  renderCall();
+  return true;
+}
+
+window.addEventListener("message", e => {
+  if (e.origin !== ZOOM || !e.data || typeof e.data.type !== "string") return;
+  const { type, data: d = {} } = e.data;
+  const callee = d.callee && (d.callee.phoneNumber || d.callee.number);
+  Z.log.unshift([new Date().toLocaleTimeString(), type.replace(/^zp-|-event$/g, ""), d.direction, callee, d.result].filter(Boolean).join("  "));
+  Z.log.length = Math.min(Z.log.length, 40);
+  $("zlog").textContent = Z.log.join("\n");
+
+  const c = Z.call;
+  const m = type.match(/^zp-call-(ringing|connected|ended)-event$/);
+  if (!m || !c || c.state === "ended") return;
+  if (d.direction && d.direction !== "outbound") return;
+  if (!sameNumber(callee, c.number)) return;
+  if (c.callId && d.callId && d.callId !== c.callId) return;
+  c.callId = c.callId || d.callId;
+  if (m[1] === "ringing" && c.state === "dialing") c.state = "ringing";
+  if (m[1] === "connected") { c.state = "connected"; c.answered = true; }
+  if (m[1] === "ended") {
+    c.state = "ended";
+    // Unanswered: write the no-answer status and move on. Answered: wait for the caller to pick one.
+    if (!c.answered) {
+      if (cfg.noAnswer && S.cols.status >= 0 && !statusOf(c.i)) return setStatus(cfg.noAnswer, c.i);
+      return S.cur === c.i ? advanceFrom(c.i) : scheduleAutoDial();
+    }
+    if (statusOf(c.i)) return scheduleAutoDial();
+  }
+  renderCall();
+});
+
+function scheduleAutoDial() {
+  if (!cfg.zoom || !cfg.autoDial || Z.paused || !Z.ready || callActive() || S.cur < 0) return renderCall();
+  // Skip rows whose number can't be dialled
+  const ok = i => i >= 0 && !statusOf(i) && !!dialable(S.rows[i].cells[S.cols.phone]);
+  let i = S.cur;
+  for (let k = 0; i >= 0 && !ok(i) && k < S.rows.length; k++) i = firstBlank(i + 1);
+  if (!ok(i)) return renderCall();
+  if (i !== S.cur) { S.cur = i; render(); }
+  cancelWait();
+  const secs = Math.max(1, Math.min(60, +cfg.gap || 3));
+  Z.wait = { i, until: Date.now() + secs * 1000 };
+  Z.wait.tick = setInterval(() => {
+    if (Date.now() >= Z.wait.until) { const at = Z.wait.i; cancelWait(); if (S.cur === at) dial(at); else renderCall(); }
+    else renderCall();
+  }, 250);
+  renderCall();
+}
+function cancelWait() { if (Z.wait) clearInterval(Z.wait.tick); Z.wait = null; }
+
+function renderCall() {
+  const bar = $("callBar"), c = Z.call;
+  let text = "", act = "", cls = "";
+  if (!cfg.zoom) { bar.hidden = true; return; }
+  if (Z.wait) { cls = "wait"; text = `Calling next in ${Math.ceil((Z.wait.until - Date.now()) / 1000)}s`; act = "Pause"; }
+  else if (callActive() && c.state === "dialing") { text = `Dialling row ${c.r}…`; }
+  else if (callActive() && c.state === "ringing") { cls = "ringing"; text = `Ringing row ${c.r}…`; }
+  else if (callActive() && c.state === "connected") { cls = "connected"; text = `Answered (row ${c.r}). Pick a status when you're done.`; }
+  else if (c && c.state === "dialing") { text = "No call updates from Zoom. Check Zoom Phone is signed in."; }
+  else if (c && c.answered && !statusOf(c.i)) { text = `Call ended. Pick a status for row ${c.r}.`; }
+  else if (cfg.autoDial && Z.paused) { text = "Auto-dial is paused"; act = "Resume"; }
+  else if (!Z.ready) { text = "Loading Zoom Phone…"; }
+  bar.hidden = !text;
+  bar.className = "callbar " + cls;
+  $("callText").textContent = text;
+  $("callAct").hidden = !act;
+  $("callAct").textContent = act;
+}
+$("callAct").onclick = () => {
+  if (Z.wait) { cancelWait(); Z.paused = true; renderCall(); }
+  else if (Z.paused) { Z.paused = false; scheduleAutoDial(); }
+};
 
 function resultRows() {
   return [S.headers, ...S.rows.map(r => r.cells)];
@@ -556,6 +720,11 @@ for (const k of ["name", "phone", "status", "notes"]) {
 }
 $("tabSel").onchange = e => { cfg.gid = e.target.value; store.set("dialer:cfg", cfg); loadLive(); };
 $("cc").oninput = e => { cfg.cc = e.target.value; store.set("dialer:cfg", cfg); render(); };
+$("callBtn").onclick = e => { if (cfg.zoom) { e.preventDefault(); dial(S.cur); } };
+$("zoomOn").onchange = e => { cfg.zoom = e.target.checked; store.set("dialer:cfg", cfg); mountPhone(); };
+$("autoDial").onchange = e => { cfg.autoDial = e.target.checked; store.set("dialer:cfg", cfg); if (cfg.autoDial) { Z.paused = false; scheduleAutoDial(); } else cancelWait(); renderCall(); };
+$("noAnswerCode").onchange = e => { cfg.noAnswer = e.target.value; store.set("dialer:cfg", cfg); };
+$("gapSec").onchange = e => { cfg.gap = Math.max(1, Math.min(60, +e.target.value || 3)); e.target.value = cfg.gap; store.set("dialer:cfg", cfg); };
 $("outcomes").onclick = e => { const b = e.target.closest("button"); if (b) setStatus(b.dataset.c); };
 $("notes").onchange = e => edit(S.cur, "notes", e.target.value);
 $("saved").onclick = e => { if (e.target.closest("[data-retry]")) pushEdits(); };
@@ -609,6 +778,10 @@ fetch("apps-script.gs").then(r => r.ok ? r.text() : Promise.reject())
 $("scriptUrl").value = cfg.scriptUrl || "";
 $("sheetUrl").value = cfg.sheetUrl || "";
 $("cc").value = cfg.cc || "";
+$("zoomOn").checked = !!cfg.zoom;
+$("autoDial").checked = !!cfg.autoDial;
+$("gapSec").value = cfg.gap || 3;
+mountPhone();
 setData("sample", "sample", "Sample list", parseCSV(SAMPLE), []);
 if (cfg.scriptUrl || cfg.sheetUrl) load(); else $("setup").open = true;
 </script>
