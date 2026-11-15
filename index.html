@@ -199,6 +199,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
       <label class="check"><input type="checkbox" id="zoomOn"> Call through Zoom Phone in this page</label>
       <span class="sub">The Zoom Phone dialer appears on this page and tells the app when a call is ringing, answered or ended. Your Zoom admin needs to install the Zoom Phone Smart Embed app, add this site's address to its approved domains, and turn on "Automatically Call From Third Party Apps" under Account Settings → Zoom Phone.</span>
       <div id="zoomOpts" class="grid2">
+        <label style="grid-column:1/-1">Your Zoom Phone number (caller ID) <input id="callerId" placeholder="e.g. +6561234567" inputmode="tel"></label>
         <label class="check" style="grid-column:1/-1"><input type="checkbox" id="autoDial"> Auto-dial the next number</label>
         <label>Status for unanswered calls <select id="noAnswerCode"></select></label>
         <label>Seconds before the next call <input id="gapSec" type="number" min="1" max="60" inputmode="numeric"></label>
@@ -620,7 +621,9 @@ function dial(i) {
   if (callActive()) { toast("A call is still going. End it in Zoom Phone first."); return false; }
   cancelWait();
   Z.paused = false;
-  Z.frame.contentWindow.postMessage({ type: "zp-make-call", data: { number: num } }, ZOOM);
+  // Zoom refuses calls with "No available callerId" unless the caller ID is passed
+  const callerId = digits(cfg.callerId) ? "+" + digits(cfg.callerId) : undefined;
+  Z.frame.contentWindow.postMessage({ type: "zp-make-call", data: { number: num, callerId, autoDial: true } }, ZOOM);
   Z.call = { i, r: row.r, number: num, state: "dialing", answered: false, at: Date.now() };
   renderCall();
   return true;
@@ -723,6 +726,7 @@ $("cc").oninput = e => { cfg.cc = e.target.value; store.set("dialer:cfg", cfg); 
 $("callBtn").onclick = e => { if (cfg.zoom) { e.preventDefault(); dial(S.cur); } };
 $("zoomOn").onchange = e => { cfg.zoom = e.target.checked; store.set("dialer:cfg", cfg); mountPhone(); };
 $("autoDial").onchange = e => { cfg.autoDial = e.target.checked; store.set("dialer:cfg", cfg); if (cfg.autoDial) { Z.paused = false; scheduleAutoDial(); } else cancelWait(); renderCall(); };
+$("callerId").onchange = e => { cfg.callerId = e.target.value.trim(); store.set("dialer:cfg", cfg); };
 $("noAnswerCode").onchange = e => { cfg.noAnswer = e.target.value; store.set("dialer:cfg", cfg); };
 $("gapSec").onchange = e => { cfg.gap = Math.max(1, Math.min(60, +e.target.value || 3)); e.target.value = cfg.gap; store.set("dialer:cfg", cfg); };
 $("outcomes").onclick = e => { const b = e.target.closest("button"); if (b) setStatus(b.dataset.c); };
@@ -781,6 +785,7 @@ $("cc").value = cfg.cc || "";
 $("zoomOn").checked = !!cfg.zoom;
 $("autoDial").checked = !!cfg.autoDial;
 $("gapSec").value = cfg.gap || 3;
+$("callerId").value = cfg.callerId || "";
 mountPhone();
 setData("sample", "sample", "Sample list", parseCSV(SAMPLE), []);
 if (cfg.scriptUrl || cfg.sheetUrl) load(); else $("setup").open = true;
