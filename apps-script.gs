@@ -6,7 +6,10 @@
 // GET ?gid=123&statusCol=5 → the tab's values (row 1 is the header row), the list of
 // tabs, and the options of the status column's dropdown. statusCol is 1-based; without
 // it, the first column whose header contains "status" is used.
+//
+// GET ?settings=1&user=Name → { settings } saved for that name (null if none yet).
 function doGet(e) {
+  if (e.parameter.settings) return json_({ settings: readSettings_(e.parameter.user) });
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = getSheet_(e.parameter.gid);
   const values = sh.getDataRange().getDisplayValues();
@@ -24,11 +27,20 @@ function doGet(e) {
 // POST { gid, row, phoneCol, phone, cells: [{ col, value }] }
 // Columns are 1-based. If the row no longer holds that phone number (the sheet was
 // sorted or rows were inserted), the row is found again by searching the phone column.
+//
+// POST { action: "settings", user, settings } saves Sheet Dialer's settings for that name,
+// so signing in on another device picks them up.
 function doPost(e) {
   const d = JSON.parse(e.postData.contents);
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
+    if (d.action === "settings") {
+      const key = settingsKey_(d.user);
+      if (!key) return json_({ ok: false, error: "No name given" });
+      PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(d.settings || {}));
+      return json_({ ok: true });
+    }
     const sh = getSheet_(d.gid);
     let row = d.row;
     if (d.phoneCol && d.phone && sh.getRange(row, d.phoneCol).getDisplayValue() !== d.phone) {
@@ -54,6 +66,17 @@ function dropdownOptions_(sh, col) {
   if (type === C.VALUE_IN_LIST) return args[0].filter(String);
   if (type === C.VALUE_IN_RANGE) return args[0].getDisplayValues().flat().filter(String);
   return [];
+}
+
+function settingsKey_(user) {
+  const name = String(user || "").trim().toLowerCase();
+  return name ? "settings:" + name : "";
+}
+
+function readSettings_(user) {
+  const key = settingsKey_(user);
+  const raw = key && PropertiesService.getScriptProperties().getProperty(key);
+  return raw ? JSON.parse(raw) : null;
 }
 
 function getSheet_(gid) {

@@ -160,18 +160,37 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
   body.zoom .wrap > * { grid-column: 1; }
   body.zoom .wrap > .phone { grid-column: 2; grid-row: 1 / span 20; align-self: start; position: sticky; top: 16px; }
 }
+/* Signed out: only the sign-in card shows */
+body.signedout .wrap > :not(#login) { display: none !important; }
+.login { max-width: 420px; width: 100%; margin: 8vh auto 0; }
+.login .link { justify-self: start; }
+header .actions { align-items: center; }
 @media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } .phone iframe { min-width: 0; } }
 @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <section class="panel login" id="login" hidden>
+    <h1>Sheet Dialer</h1>
+    <span class="sub">Sign in to get your sheet and call settings on any device.</span>
+    <label>Your name <input id="loginName" autocomplete="username" placeholder="e.g. Priya"></label>
+    <label>Team link (Apps Script web app URL) <input id="loginLink" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <button class="primary" id="loginBtn">Sign in</button>
+    <p class="msg" id="loginMsg"></p>
+    <button class="link" id="guestBtn">Continue without signing in</button>
+  </section>
+
   <header>
     <div>
       <h1>Sheet Dialer</h1>
       <span class="sub mode" id="modeLabel">Sample list</span>
     </div>
-    <button id="refreshBtn">Refresh</button>
+    <div class="actions">
+      <span class="sub" id="who" hidden></span>
+      <button id="refreshBtn">Refresh</button>
+      <button id="signOutBtn">Sign out</button>
+    </div>
   </header>
 
   <details class="panel" id="setup">
@@ -197,7 +216,6 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
     <div class="help">
       <strong>Zoom Phone</strong>
       <label class="check"><input type="checkbox" id="zoomOn"> Call through Zoom Phone in this page</label>
-      <span class="sub">The Zoom Phone dialer appears on this page and tells the app when a call is ringing, answered or ended. Your Zoom admin needs to install the Zoom Phone Smart Embed app, add this site's address to its approved domains, and turn on "Automatically Call From Third Party Apps" under Account Settings → Zoom Phone.</span>
       <div id="zoomOpts" class="grid2">
         <label style="grid-column:1/-1">Your Zoom Phone number (caller ID) <input id="callerId" placeholder="e.g. +6561234567" inputmode="tel"></label>
         <label class="check" style="grid-column:1/-1"><input type="checkbox" id="autoDial"> Auto-dial the next number</label>
@@ -205,8 +223,8 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
         <label>Seconds before the next call <input id="gapSec" type="number" min="1" max="60" inputmode="numeric"></label>
       </div>
     </div>
-    <div class="help">
-      <strong>Turn on sheet updates (one time)</strong>
+    <details class="help">
+      <summary><strong>Turn on sheet updates (one time)</strong></summary>
       <span class="sub">With this on, the app reads your tabs and the Status dropdown, and every status you tap is written straight into the sheet. Without it, paste only the Google Sheet link: the app can read a sheet shared as "Anyone with the link", but statuses stay on this device.</span>
       <ol>
         <li>In your sheet, open <b>Extensions → Apps Script</b>.</li>
@@ -217,7 +235,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
       <span class="sub">Keep that link private. Anyone who has it can read and change the sheet.</span>
       <div class="actions"><button id="copyScript">Copy script</button></div>
       <pre id="scriptText">Loading script…</pre>
-    </div>
+    </details>
   </details>
 
   <div class="progress">
@@ -290,6 +308,66 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 const colLetter = i => { let s = ""; for (i++; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };
 
 const cfg = store.get("dialer:cfg", { scriptUrl: "", sheetUrl: "", gid: "", cc: "", cols: {} });
+
+// ---------- Sign-in and settings sync ----------
+// Signing in = your name + the Apps Script link. Settings are kept in this browser and,
+// when the script supports it, in the sheet's script properties under your name, so the
+// same sign-in on another device picks them up.
+const SYNC_KEYS = ["sheetUrl", "gid", "linkGid", "cc", "cols", "zoom", "autoDial", "noAnswer", "gap", "callerId"];
+const scriptLink = s => (s = (s || "").trim()) && (s.startsWith("https://") ? s : `https://script.google.com/macros/s/${s}/exec`);
+function saveCfg() {
+  store.set("dialer:cfg", cfg);
+  if (!cfg.user || !cfg.synced || !cfg.scriptUrl) return;
+  clearTimeout(saveCfg.t);
+  saveCfg.t = setTimeout(() => {
+    const settings = Object.fromEntries(SYNC_KEYS.filter(k => k in cfg).map(k => [k, cfg[k]]));
+    fetch(cfg.scriptUrl, { method: "POST", body: JSON.stringify({ action: "settings", user: cfg.user, settings }) }).catch(() => {});
+  }, 1200);
+}
+// → { supported, settings } ; supported is false for an older script that only returns sheet data
+async function fetchSettings(url, user) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const data = await (await fetch(url + "?settings=1&user=" + encodeURIComponent(user), { signal: ctl.signal })).json();
+    return { supported: "settings" in data, settings: data.settings };
+  } finally { clearTimeout(t); }
+}
+async function signIn() {
+  const user = $("loginName").value.trim();
+  const url = scriptLink($("loginLink").value);
+  const msg = t => { $("loginMsg").textContent = t; };
+  if (!user) return msg("Enter your name.");
+  if (!/^https:\/\/script\.google\.com\//.test(url || "")) return msg("The team link should start with https://script.google.com/macros/s/");
+  msg("Signing in…");
+  $("loginBtn").disabled = true;
+  try {
+    const { supported, settings } = await fetchSettings(url, user);
+    if (supported && settings) for (const k of SYNC_KEYS) if (k in settings) cfg[k] = settings[k];
+    Object.assign(cfg, { user, scriptUrl: url, synced: supported, guest: false });
+    store.set("dialer:lastLink", url);
+    saveCfg();
+    if (!supported) store.set("dialer:notice", "Your settings are saved on this device only. Update the Apps Script (Setup → Turn on sheet updates) to keep them across devices.");
+    location.reload();
+  } catch {
+    msg("Couldn't reach that link. Check it's the Web app URL and access is set to Anyone.");
+    $("loginBtn").disabled = false;
+  }
+}
+function signOut() {
+  if (!confirm("Sign out of Sheet Dialer on this device?")) return;
+  for (const k of [...SYNC_KEYS, "user", "synced", "guest", "scriptUrl"]) delete cfg[k];
+  cfg.cols = {};
+  store.set("dialer:cfg", cfg);
+  location.reload();
+}
+function showLogin() {
+  document.body.classList.add("signedout");
+  $("login").hidden = false;
+  $("loginName").value = cfg.user || "";
+  $("loginLink").value = cfg.scriptUrl || store.get("dialer:lastLink", "");
+  ($("loginName").value ? $("loginLink") : $("loginName")).focus();
+}
 // S.rows: [{ r: sheet row number (1-based), cells: [...] }]; S.edits: { [r]: { status?, notes?, phone, err? } } not yet in the sheet
 let S = { mode: "sample", key: "sample", label: "Sample list", headers: [], rows: [], cols: {}, cur: 0, sheetCodes: [], tabs: [], gid: "", edits: {} };
 const sending = new Set();
@@ -327,7 +405,7 @@ async function load() {
   cfg.sheetUrl = $("sheetUrl").value.trim();
   const fromLink = parseSheetUrl(cfg.sheetUrl);
   if (fromLink && fromLink.gid && fromLink.gid !== cfg.linkGid) { cfg.gid = fromLink.gid; cfg.linkGid = fromLink.gid; }
-  store.set("dialer:cfg", cfg);
+  saveCfg();
   if (cfg.scriptUrl && !/^https:\/\/script\.google\.com\//.test(cfg.scriptUrl))
     return showMsg("The sheet updates link should start with https://script.google.com/macros/s/");
   if (cfg.scriptUrl) return loadLive();
@@ -344,7 +422,7 @@ async function loadLive(statusCol) {
     const res = await fetch(url);
     const data = await res.json();
     cfg.gid = String(data.gid);
-    store.set("dialer:cfg", cfg);
+    saveCfg();
     S.tabs = data.tabs || [];
     setData("live", cfg.scriptUrl + "|" + cfg.gid, data.name, data.values, data.statusOptions || []);
     showMsg(`Loaded ${S.rows.length} rows from "${data.name}".`, true);
@@ -422,7 +500,7 @@ function dialable(raw) {
   if (n && !n.startsWith("+") && cc) n = (cc.startsWith("+") ? cc : "+" + cc) + n.replace(/^0+/, "");
   return n.replace(/\d/g, "").length > 1 || n.replace(/\D/g, "").length < 6 ? "" : n;
 }
-function saveCols() { cfg.cols[S.key] = S.cols; store.set("dialer:cfg", cfg); }
+function saveCols() { cfg.cols[S.key] = S.cols; saveCfg(); }
 function saveEdits() { store.set("dialer:edits:" + S.key, S.edits); }
 
 // ---------- Render ----------
@@ -739,14 +817,14 @@ for (const k of ["name", "phone", "status", "notes"]) {
     render();
   };
 }
-$("tabSel").onchange = e => { cfg.gid = e.target.value; store.set("dialer:cfg", cfg); loadLive(); };
-$("cc").oninput = e => { cfg.cc = e.target.value; store.set("dialer:cfg", cfg); render(); };
+$("tabSel").onchange = e => { cfg.gid = e.target.value; saveCfg(); loadLive(); };
+$("cc").oninput = e => { cfg.cc = e.target.value; saveCfg(); render(); };
 $("callBtn").onclick = e => { if (cfg.zoom) { e.preventDefault(); dial(S.cur); } };
-$("zoomOn").onchange = e => { cfg.zoom = e.target.checked; store.set("dialer:cfg", cfg); mountPhone(); };
-$("autoDial").onchange = e => { cfg.autoDial = e.target.checked; store.set("dialer:cfg", cfg); if (cfg.autoDial) { Z.paused = false; scheduleAutoDial(); } else cancelWait(); renderCall(); };
-$("callerId").onchange = e => { cfg.callerId = e.target.value.trim(); store.set("dialer:cfg", cfg); };
-$("noAnswerCode").onchange = e => { cfg.noAnswer = e.target.value; store.set("dialer:cfg", cfg); };
-$("gapSec").onchange = e => { cfg.gap = Math.max(1, Math.min(60, +e.target.value || 3)); e.target.value = cfg.gap; store.set("dialer:cfg", cfg); };
+$("zoomOn").onchange = e => { cfg.zoom = e.target.checked; saveCfg(); mountPhone(); };
+$("autoDial").onchange = e => { cfg.autoDial = e.target.checked; saveCfg(); if (cfg.autoDial) { Z.paused = false; scheduleAutoDial(); } else cancelWait(); renderCall(); };
+$("callerId").onchange = e => { cfg.callerId = e.target.value.trim(); saveCfg(); };
+$("noAnswerCode").onchange = e => { cfg.noAnswer = e.target.value; saveCfg(); };
+$("gapSec").onchange = e => { cfg.gap = Math.max(1, Math.min(60, +e.target.value || 3)); e.target.value = cfg.gap; saveCfg(); };
 $("outcomes").onclick = e => { const b = e.target.closest("button"); if (b) setStatus(b.dataset.c); };
 $("notes").onchange = e => edit(S.cur, "notes", e.target.value);
 $("saved").onclick = e => { if (e.target.closest("[data-retry]")) pushEdits(); };
@@ -789,24 +867,49 @@ function readSetupLink() {
   else if (fromLink && fromLink.gid) cfg.gid = fromLink.gid;
   cfg.linkGid = fromLink && fromLink.gid;
   if (p.has("cc")) cfg.cc = "+" + p.get("cc").replace(/\D/g, "");
-  store.set("dialer:cfg", cfg);
+  saveCfg();
   history.replaceState(null, "", location.pathname + location.search);
   toast("Setup saved from your link");
 }
-readSetupLink();
+$("loginBtn").onclick = signIn;
+$("loginLink").onkeydown = $("loginName").onkeydown = e => { if (e.key === "Enter") signIn(); };
+$("guestBtn").onclick = () => { cfg.guest = true; saveCfg(); location.reload(); };
+// Doubles as "Sign in" for someone who chose to continue without signing in
+$("signOutBtn").onclick = () => { if (cfg.user) return signOut(); cfg.guest = false; saveCfg(); location.reload(); };
+
+async function start() {
+  readSetupLink();
+  if (!cfg.user && !cfg.guest) return showLogin();
+  $("who").hidden = !cfg.user;
+  $("who").textContent = cfg.user ? "Signed in as " + cfg.user : "";
+  $("signOutBtn").textContent = cfg.user ? "Sign out" : "Sign in";
+  const notice = store.get("dialer:notice", "");
+  if (notice) { localStorage.removeItem("dialer:notice"); setTimeout(() => toast(notice), 300); }
+  // Pick up changes made on another device
+  if (cfg.user && cfg.synced) {
+    try {
+      const { settings } = await fetchSettings(cfg.scriptUrl, cfg.user);
+      if (settings) { for (const k of SYNC_KEYS) if (k in settings) cfg[k] = settings[k]; store.set("dialer:cfg", cfg); }
+    } catch {}
+  }
+  fillInputs();
+}
 fetch("apps-script.gs").then(r => r.ok ? r.text() : Promise.reject())
   .then(t => $("scriptText").textContent = t)
   .catch(() => $("scriptText").textContent = "Couldn't load the script. Get it from github.com/aravintp/sheet-dialer (apps-script.gs).");
-$("scriptUrl").value = cfg.scriptUrl || "";
-$("sheetUrl").value = cfg.sheetUrl || "";
-$("cc").value = cfg.cc || "";
-$("zoomOn").checked = !!cfg.zoom;
-$("autoDial").checked = !!cfg.autoDial;
-$("gapSec").value = cfg.gap || 3;
-$("callerId").value = cfg.callerId || "";
-mountPhone();
-setData("sample", "sample", "Sample list", parseCSV(SAMPLE), []);
-if (cfg.scriptUrl || cfg.sheetUrl) load(); else $("setup").open = true;
+function fillInputs() {
+  $("scriptUrl").value = cfg.scriptUrl || "";
+  $("sheetUrl").value = cfg.sheetUrl || "";
+  $("cc").value = cfg.cc || "";
+  $("zoomOn").checked = !!cfg.zoom;
+  $("autoDial").checked = !!cfg.autoDial;
+  $("gapSec").value = cfg.gap || 3;
+  $("callerId").value = cfg.callerId || "";
+  mountPhone();
+  setData("sample", "sample", "Sample list", parseCSV(SAMPLE), []);
+  if (cfg.scriptUrl || cfg.sheetUrl) load(); else $("setup").open = true;
+}
+start();
 </script>
 </body>
 </html>
