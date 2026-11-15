@@ -622,7 +622,14 @@ function dial(i) {
   cancelWait();
   Z.paused = false;
   // Zoom refuses calls with "No available callerId" unless the caller ID is passed
-  const callerId = digits(cfg.callerId) ? "+" + digits(cfg.callerId) : undefined;
+  // Formatted like the numbers we dial, so a local number gets the country code from setup
+  const callerId = dialable(cfg.callerId);
+  if (!callerId) {
+    $("setup").open = true;
+    $("callerId").focus();
+    toast("Fill in your Zoom Phone number (caller ID) in setup first.");
+    return false;
+  }
   Z.frame.contentWindow.postMessage({ type: "zp-make-call", data: { number: num, callerId, autoDial: true } }, ZOOM);
   Z.call = { i, r: row.r, number: num, state: "dialing", answered: false, at: Date.now() };
   renderCall();
