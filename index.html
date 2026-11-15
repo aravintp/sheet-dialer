@@ -637,6 +637,17 @@ window.addEventListener("message", e => {
   Z.log.length = Math.min(Z.log.length, 40);
   $("zlog").textContent = Z.log.join("\n");
 
+  // Once the dialer says it's ready, send its settings. Ask for call events even when this
+  // tab isn't focused: during a call the Zoom desktop window usually is.
+  if (/ready/.test(type) && Z.frame) {
+    Z.frame.contentWindow.postMessage({ type: "zp-init-config", data: {
+      enableSavingLog: false, enableAutoLog: false, enableContactSearching: false,
+      enableContactMatching: false, disableInactiveTabCallEvent: false,
+    } }, ZOOM);
+    Z.ready = true;
+    renderCall();
+  }
+
   const c = Z.call;
   const m = type.match(/^zp-call-(ringing|connected|ended)-event$/);
   if (!m || !c || c.state === "ended") return;
