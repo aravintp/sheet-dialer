@@ -134,7 +134,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .qhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .qhead label { display: flex; align-items: center; gap: 6px; font-weight: 500; }
 .qhead input { width: auto; }
-.queue { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); max-height: 360px; overflow-y: auto; }
+.queue { position: relative; list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); max-height: 360px; overflow-y: auto; }
 .row { display: grid; grid-template-columns: 2.6em 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .row:last-child { border-bottom: none; }
 .row.cur { background: var(--accent-soft); }
@@ -293,7 +293,7 @@ header .actions { align-items: center; }
       <label class="check"><input type="checkbox" id="zoomOn"> Call through Zoom Phone in this page</label>
       <div id="zoomOpts" class="grid2">
         <label style="grid-column:1/-1">Your Zoom Phone number (caller ID) <input id="callerId" placeholder="e.g. +6561234567" inputmode="tel"></label>
-        <label class="check" style="grid-column:1/-1"><input type="checkbox" id="autoDial"> Auto-dial the next number</label>
+        <label class="check" style="grid-column:1/-1"><input type="checkbox" id="autoDial"> Auto-dial the next number (press ▶ Start to begin)</label>
         <label>Status for unanswered calls <select id="noAnswerCode"></select></label>
         <label>Seconds before the next call <input id="gapSec" type="number" min="1" max="60" inputmode="numeric"></label>
       </div>
@@ -623,8 +623,14 @@ function renderQueue() {
       <span class="who"><b>${esc(row.cells[S.cols.name] || "(no name)")}</b><span>${esc(row.cells[S.cols.phone])}</span></span>
       <span class="chip ${tone(s)}">${s ? esc(s) : "To call"}</span></li>`;
   }).join("") || `<li class="row"><span></span><span class="sub">No rows to show.</span><span></span></li>`;
-  const cur = $("queue").querySelector(".cur");
-  if (cur) cur.scrollIntoView({ block: "nearest" });
+  // Keep the current row visible inside the list's own scroll box only. scrollIntoView
+  // would also scroll the whole page down to the list on every update.
+  const q = $("queue"), cur = q.querySelector(".cur");
+  if (cur) {
+    const top = cur.offsetTop, bottom = top + cur.offsetHeight;
+    if (top < q.scrollTop) q.scrollTop = top;
+    else if (bottom > q.scrollTop + q.clientHeight) q.scrollTop = bottom - q.clientHeight;
+  }
 }
 
 // ---------- Changes ----------
@@ -692,7 +698,8 @@ function advanceFrom(i) {
 // zp-call-ringing-event / zp-call-connected-event / zp-call-ended-event. It has no command
 // to hang up, so an unanswered call ends on Zoom's side (ring timeout, voicemail, decline).
 const ZOOM = "https://applications.zoom.us";
-const Z = { frame: null, ready: false, call: null, wait: null, paused: false, log: [] };
+// running: Start was pressed this session. The Auto-dial setting only shows the Start/Pause buttons.
+const Z = { frame: null, ready: false, call: null, wait: null, running: false, paused: false, log: [] };
 // Z.call: { i, r, number, state: "dialing" | "ringing" | "connected" | "ended", answered, at }
 const digits = n => String(n || "").replace(/\D/g, "");
 const sameNumber = (a, b) => { a = digits(a); b = digits(b); return a.length >= 6 && b.length >= 6 && a.slice(-8) === b.slice(-8); };
@@ -787,7 +794,7 @@ window.addEventListener("message", e => {
 });
 
 function scheduleAutoDial() {
-  if (!cfg.zoom || !cfg.autoDial || Z.paused || !Z.ready || callActive() || S.cur < 0) return renderCall();
+  if (!cfg.zoom || !cfg.autoDial || !Z.running || Z.paused || !Z.ready || callActive() || S.cur < 0) return renderCall();
   // Skip rows whose number can't be dialled
   const ok = i => i >= 0 && !statusOf(i) && !!dialable(S.rows[i].cells[S.cols.phone]);
   let i = S.cur;
@@ -808,32 +815,32 @@ function cancelWait() { if (Z.wait) clearInterval(Z.wait.tick); Z.wait = null; }
 function renderCall() {
   const bar = $("callBar"), c = Z.call;
   let text = "", cls = "";
-  $("autoCtl").hidden = !cfg.zoom;
+  $("autoCtl").hidden = !cfg.zoom || !cfg.autoDial;
   if (!cfg.zoom) { bar.hidden = true; return; }
-  $("autoStart").textContent = cfg.autoDial ? "■ Stop" : "▶ Start";
-  $("autoStart").className = cfg.autoDial ? "" : "primary";
+  $("autoStart").textContent = Z.running ? "■ Stop" : "▶ Start";
+  $("autoStart").className = Z.running ? "" : "primary";
   $("autoPause").textContent = Z.paused ? "▶ Resume" : "❚❚ Pause";
-  $("autoPause").disabled = !cfg.autoDial;
+  $("autoPause").disabled = !Z.running;
   if (Z.wait) { cls = "wait"; text = `Calling next in ${Math.ceil((Z.wait.until - Date.now()) / 1000)}s`; }
+  // Zoom's embedded dialer can't hang up, so a status tapped mid-call waits for the hang-up
+  else if (callActive() && statusOf(c.i)) { cls = "connected"; text = `Saved "${statusOf(c.i)}" for row ${c.r}. Hang up in Zoom to move on.`; }
   else if (callActive() && c.state === "dialing") { text = `Dialling row ${c.r}…`; }
   else if (callActive() && c.state === "ringing") { cls = "ringing"; text = `Ringing row ${c.r}…`; }
   else if (callActive() && c.state === "connected") { cls = "connected"; text = `Answered (row ${c.r}). Pick a status when you're done.`; }
   else if (c && c.state === "dialing") { text = "No call updates from Zoom. Check Zoom Phone is signed in."; }
   else if (c && c.answered && !statusOf(c.i)) { text = `Call ended. Pick a status for row ${c.r}.`; }
-  else if (cfg.autoDial && Z.paused) { text = "Auto-dial is paused"; }
+  else if (Z.running && Z.paused) { text = "Auto-dial is paused"; }
   else if (!Z.ready) { text = "Loading Zoom Phone…"; }
   bar.hidden = !text;
   bar.className = "callbar " + cls;
   $("callText").textContent = text;
 }
-// Start/Stop turns auto-dial on or off (same as the setup checkbox). Pause holds it
-// without turning it off; a call already in progress carries on either way.
+// Start/Stop runs auto-dial for this session; nothing dials until Start is pressed.
+// Pause holds it without stopping; a call already in progress carries on either way.
 $("autoStart").onclick = () => {
-  cfg.autoDial = !cfg.autoDial;
-  $("autoDial").checked = cfg.autoDial;
-  saveCfg();
+  Z.running = !Z.running;
   Z.paused = false;
-  if (cfg.autoDial) scheduleAutoDial(); else cancelWait();
+  if (Z.running) scheduleAutoDial(); else cancelWait();
   renderCall();
 };
 $("autoPause").onclick = () => {
@@ -867,7 +874,8 @@ $("tabSel").onchange = e => { cfg.gid = e.target.value; saveCfg(); loadLive(); }
 $("cc").oninput = e => { cfg.cc = e.target.value; saveCfg(); render(); };
 $("callBtn").onclick = e => { if (cfg.zoom) { e.preventDefault(); dial(S.cur); } };
 $("zoomOn").onchange = e => { cfg.zoom = e.target.checked; saveCfg(); mountPhone(); };
-$("autoDial").onchange = e => { cfg.autoDial = e.target.checked; saveCfg(); if (cfg.autoDial) { Z.paused = false; scheduleAutoDial(); } else cancelWait(); renderCall(); };
+// Ticking only shows the Start/Pause buttons; unticking also stops a running auto-dial
+$("autoDial").onchange = e => { cfg.autoDial = e.target.checked; saveCfg(); if (!cfg.autoDial) { Z.running = Z.paused = false; cancelWait(); } renderCall(); };
 // ---------- Side panel ----------
 // tab: "settings" | "zoom" | "" (closed). Remembered per device, not synced: it's about this screen.
 function openSide(tab) {
