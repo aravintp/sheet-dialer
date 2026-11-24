@@ -144,15 +144,28 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .row .who span { font: 500 0.8rem var(--font-num); color: var(--muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; max-width: calc(100vw - 32px); }
-/* Zoom Phone: the softphone sits beside the list on wide screens, under the contact card on phones */
-.phone { display: grid; gap: 8px; }
-.phonehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; background: none; border: none; padding: 4px 0; text-align: left; }
-.phonehead:hover { border: none; }
-.phonebody { display: grid; gap: 8px; }
-/* Collapsed: clip the dialer instead of display:none so it stays signed in and keeps sending call events */
-body.phonemin .phonebody { height: 0; overflow: hidden; }
-body.phonemin .phone { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; }
-.phone iframe { width: 100%; min-width: 350px; height: 580px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+/* Side panel: docked on the right on wide screens, over the page on phones. Closed and
+   inactive panes are moved/clipped, never display:none, so the Zoom dialer keeps running. */
+.side {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(420px, 100vw);
+  display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--line);
+  box-shadow: -8px 0 24px -12px rgba(0,0,0,.25); transform: translateX(105%); transition: transform .2s ease;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+body.sideopen .side { transform: none; }
+.sidehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--bg); }
+.tabs button { border: none; background: none; padding: 8px 16px; }
+.tabs button[aria-selected="true"] { background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.iconbtn { padding: 8px 12px; }
+.pane { display: grid; gap: 12px; align-content: start; }
+.pane.on { flex: 1; overflow-y: auto; padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+.pane:not(.on) { flex: 0 0 0; height: 0; overflow: hidden; padding: 0; }
+.pane label { font-size: 0.8rem; }
+.pane summary { cursor: pointer; }
+#phone iframe { width: 100%; min-width: 350px; height: 580px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+@media (min-width: 1000px) { body.sideopen { padding-right: calc(420px + 16px); } }
+@media (max-width: 420px) { #phone iframe { min-width: 0; } }
 .callbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.875rem; padding: 10px 12px; border-radius: 8px; background: var(--bg); }
 .callbar.ringing { background: var(--t1-soft); color: var(--t1); }
 .callbar.connected { background: var(--t0-soft); color: var(--t0); }
@@ -161,17 +174,12 @@ body.phonemin .phone { background: var(--surface); border: 1px solid var(--line)
 .check { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--fg); }
 .check input { width: auto; }
 .zlog { margin: 0; max-height: 120px; overflow: auto; font: 500 0.7rem/1.5 var(--font-num); color: var(--muted); white-space: pre-wrap; }
-@media (min-width: 1000px) {
-  body.zoom:not(.phonemin) .wrap { max-width: 980px; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 24px; }
-  body.zoom:not(.phonemin) .wrap > * { grid-column: 1; }
-  body.zoom:not(.phonemin) .wrap > .phone { grid-column: 2; grid-row: 1 / span 20; align-self: start; position: sticky; top: 16px; }
-}
 /* Signed out: only the sign-in card shows */
-body.signedout .wrap > :not(#login) { display: none !important; }
+body.signedout .wrap > :not(#login), body.signedout .side { display: none !important; }
 .login { max-width: 420px; width: 100%; margin: 8vh auto 0; }
 .login .link { justify-self: start; }
 header .actions { align-items: center; }
-@media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } .phone iframe { min-width: 0; } }
+@media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
 </style>
 </head>
@@ -195,54 +203,11 @@ header .actions { align-items: center; }
     <div class="actions">
       <span class="sub" id="who" hidden></span>
       <button id="refreshBtn">Refresh</button>
+      <button id="openSettings" aria-controls="side">⚙ Settings</button>
+      <button id="openZoom" aria-controls="side" hidden>Zoom</button>
       <button id="signOutBtn">Sign out</button>
     </div>
   </header>
-
-  <details class="panel" id="setup">
-    <summary><strong>Connect your Google Sheet</strong></summary>
-    <label>Sheet updates link (from Apps Script)
-      <input id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
-    </label>
-    <label>Google Sheet link (opens on the tab in the link)
-      <input id="sheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
-    </label>
-    <button class="primary" id="loadBtn">Load sheet</button>
-    <p class="msg ok" id="msg"></p>
-    <label id="tabWrap" hidden>Tab <select id="tabSel"></select></label>
-    <div class="grid2">
-      <label>Name column <select id="nameCol"></select></label>
-      <label>Phone column <select id="phoneCol"></select></label>
-      <label>Status column <select id="statusCol"></select></label>
-      <label>Notes column <select id="notesCol"></select></label>
-    </div>
-    <label>Country code for numbers without one (optional)
-      <input id="cc" placeholder="e.g. +65" inputmode="tel">
-    </label>
-    <div class="help">
-      <strong>Zoom Phone</strong>
-      <label class="check"><input type="checkbox" id="zoomOn"> Call through Zoom Phone in this page</label>
-      <div id="zoomOpts" class="grid2">
-        <label style="grid-column:1/-1">Your Zoom Phone number (caller ID) <input id="callerId" placeholder="e.g. +6561234567" inputmode="tel"></label>
-        <label class="check" style="grid-column:1/-1"><input type="checkbox" id="autoDial"> Auto-dial the next number</label>
-        <label>Status for unanswered calls <select id="noAnswerCode"></select></label>
-        <label>Seconds before the next call <input id="gapSec" type="number" min="1" max="60" inputmode="numeric"></label>
-      </div>
-    </div>
-    <details class="help">
-      <summary><strong>Turn on sheet updates (one time)</strong></summary>
-      <span class="sub">With this on, the app reads your tabs and the Status dropdown, and every status you tap is written straight into the sheet. Without it, paste only the Google Sheet link: the app can read a sheet shared as "Anyone with the link", but statuses stay on this device.</span>
-      <ol>
-        <li>In your sheet, open <b>Extensions → Apps Script</b>.</li>
-        <li>Delete what's there, paste the script below, and click <b>Save</b>.</li>
-        <li>Click <b>Deploy → New deployment</b>, choose type <b>Web app</b>, set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then <b>Deploy</b> and allow access.</li>
-        <li>Copy the <b>Web app URL</b> and paste it in the first box above.</li>
-      </ol>
-      <span class="sub">Keep that link private. Anyone who has it can read and change the sheet.</span>
-      <div class="actions"><button id="copyScript">Copy script</button></div>
-      <pre id="scriptText">Loading script…</pre>
-    </details>
-  </details>
 
   <div class="progress">
     <div class="bar"><i id="barFill"></i></div>
@@ -279,16 +244,6 @@ header .actions { align-items: center; }
     </div>
   </section>
 
-  <aside class="phone" id="phone" hidden>
-    <button class="phonehead" id="phoneToggle" aria-expanded="true" aria-controls="phoneBody">
-      <span class="h2">Zoom Phone</span><span class="sub" id="phoneHint">Hide</span>
-    </button>
-    <div class="phonebody" id="phoneBody">
-      <div id="phoneSlot"></div>
-      <details><summary class="sub">Call events from Zoom</summary><pre class="zlog" id="zlog">None yet.</pre></details>
-    </div>
-  </aside>
-
   <section style="display:grid;gap:10px">
     <div class="qhead">
       <h2>Call list</h2>
@@ -300,7 +255,69 @@ header .actions { align-items: center; }
       <button id="dlResults">Download CSV</button>
     </div>
   </section>
+
 </div>
+
+<!-- Side panel: Settings (sheet + Zoom options) and the Zoom dialer. Docked on the right
+     on wide screens, sliding over the page on phones. -->
+<aside class="side" id="side" aria-label="Side panel" inert>
+  <div class="sidehead">
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="settings" id="tabSettings">Settings</button>
+      <button role="tab" data-tab="zoom" id="tabZoom">Zoom</button>
+    </div>
+    <button class="iconbtn" id="sideClose" aria-label="Close side panel">✕</button>
+  </div>
+  <div class="pane" data-pane="settings" id="setup">
+    <h2>Google Sheet</h2>
+    <label>Sheet updates link (from Apps Script)
+      <input id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    </label>
+    <label>Google Sheet link (opens on the tab in the link)
+      <input id="sheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
+    </label>
+    <button class="primary" id="loadBtn">Load sheet</button>
+    <p class="msg ok" id="msg"></p>
+    <label id="tabWrap" hidden>Tab <select id="tabSel"></select></label>
+    <div class="grid2">
+      <label>Name column <select id="nameCol"></select></label>
+      <label>Phone column <select id="phoneCol"></select></label>
+      <label>Status column <select id="statusCol"></select></label>
+      <label>Notes column <select id="notesCol"></select></label>
+    </div>
+    <label>Country code for numbers without one (optional)
+      <input id="cc" placeholder="e.g. +65" inputmode="tel">
+    </label>
+    <div class="help">
+      <h2>Zoom Phone</h2>
+      <label class="check"><input type="checkbox" id="zoomOn"> Call through Zoom Phone in this page</label>
+      <div id="zoomOpts" class="grid2">
+        <label style="grid-column:1/-1">Your Zoom Phone number (caller ID) <input id="callerId" placeholder="e.g. +6561234567" inputmode="tel"></label>
+        <label class="check" style="grid-column:1/-1"><input type="checkbox" id="autoDial"> Auto-dial the next number</label>
+        <label>Status for unanswered calls <select id="noAnswerCode"></select></label>
+        <label>Seconds before the next call <input id="gapSec" type="number" min="1" max="60" inputmode="numeric"></label>
+      </div>
+    </div>
+    <details class="help">
+      <summary><strong>Turn on sheet updates (one time)</strong></summary>
+      <span class="sub">With this on, the app reads your tabs and the Status dropdown, and every status you tap is written straight into the sheet. Without it, paste only the Google Sheet link: the app can read a sheet shared as "Anyone with the link", but statuses stay on this device.</span>
+      <ol>
+        <li>In your sheet, open <b>Extensions → Apps Script</b>.</li>
+        <li>Delete what's there, paste the script below, and click <b>Save</b>.</li>
+        <li>Click <b>Deploy → New deployment</b>, choose type <b>Web app</b>, set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then <b>Deploy</b> and allow access.</li>
+        <li>Copy the <b>Web app URL</b> and paste it in the first box above.</li>
+      </ol>
+      <span class="sub">Keep that link private. Anyone who has it can read and change the sheet.</span>
+      <div class="actions"><button id="copyScript">Copy script</button></div>
+      <pre id="scriptText">Loading script…</pre>
+    </details>
+  </div>
+  <!-- Kept rendered while hidden (clipped, not display:none) so the dialer stays signed in and keeps sending call events -->
+  <div class="pane" data-pane="zoom" id="phone">
+    <div id="phoneSlot"></div>
+    <details><summary class="sub">Call events from Zoom</summary><pre class="zlog" id="zlog">None yet.</pre></details>
+  </div>
+</aside>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -684,8 +701,9 @@ const callActive = () => { const c = Z.call; return !!c && c.state !== "ended" &
 
 function mountPhone() {
   document.body.classList.toggle("zoom", !!cfg.zoom);
-  $("phone").hidden = !cfg.zoom;
+  $("tabZoom").hidden = $("openZoom").hidden = !cfg.zoom;
   $("zoomOpts").hidden = !cfg.zoom;
+  if (!cfg.zoom && openSide.tab === "zoom") openSide("settings");
   if (!cfg.zoom) {
     if (Z.frame) Z.frame.remove();
     Object.assign(Z, { frame: null, ready: false, call: null, paused: false });
@@ -709,7 +727,7 @@ function dial(i) {
   const row = S.rows[i];
   const num = row && dialable(row.cells[S.cols.phone]);
   if (!num) return false;
-  if (!Z.ready) { toast("Zoom Phone is still loading. Sign in to it, then press Call."); return false; }
+  if (!Z.ready) { openSide("zoom"); toast("Zoom Phone is still loading. Sign in to it, then press Call."); return false; }
   if (callActive()) { toast("A call is still going. End it in Zoom Phone first."); return false; }
   cancelWait();
   Z.paused = false;
@@ -717,9 +735,9 @@ function dial(i) {
   // Formatted like the numbers we dial, so a local number gets the country code from setup
   const callerId = dialable(cfg.callerId);
   if (!callerId) {
-    $("setup").open = true;
+    openSide("settings");
     $("callerId").focus();
-    toast("Fill in your Zoom Phone number (caller ID) in setup first.");
+    toast("Fill in your Zoom Phone number (caller ID) in Settings first.");
     return false;
   }
   Z.frame.contentWindow.postMessage({ type: "zp-make-call", data: { number: num, callerId, autoDial: true } }, ZOOM);
@@ -828,7 +846,7 @@ function resultRows() {
   return [S.headers, ...S.rows.map(r => r.cells)];
 }
 function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2400); }
-function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = "msg" + (ok ? " ok" : ""); if (!ok) $("setup").open = true; }
+function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = "msg" + (ok ? " ok" : ""); if (!ok) openSide("settings"); }
 async function copy(text, done) {
   try { await navigator.clipboard.writeText(text); toast(done); }
   catch { toast("Copy was blocked. Select the text and copy it instead."); }
@@ -850,15 +868,27 @@ $("cc").oninput = e => { cfg.cc = e.target.value; saveCfg(); render(); };
 $("callBtn").onclick = e => { if (cfg.zoom) { e.preventDefault(); dial(S.cur); } };
 $("zoomOn").onchange = e => { cfg.zoom = e.target.checked; saveCfg(); mountPhone(); };
 $("autoDial").onchange = e => { cfg.autoDial = e.target.checked; saveCfg(); if (cfg.autoDial) { Z.paused = false; scheduleAutoDial(); } else cancelWait(); renderCall(); };
-// Collapsing is remembered per device, not synced: it's about this screen's size
-function setPhoneMin(min) {
-  document.body.classList.toggle("phonemin", min);
-  $("phoneToggle").setAttribute("aria-expanded", String(!min));
-  $("phoneHint").textContent = min ? "Show" : "Hide";
-  store.set("dialer:phonemin", min);
+// ---------- Side panel ----------
+// tab: "settings" | "zoom" | "" (closed). Remembered per device, not synced: it's about this screen.
+function openSide(tab) {
+  if (tab === "zoom" && !cfg.zoom) tab = "settings";
+  const open = !!tab;
+  document.body.classList.toggle("sideopen", open);
+  $("side").inert = !open;
+  for (const p of document.querySelectorAll("#side .pane")) p.classList.toggle("on", p.dataset.pane === (tab || openSide.last || "settings"));
+  for (const b of document.querySelectorAll("#side [data-tab]")) b.setAttribute("aria-selected", String(b.dataset.tab === tab));
+  $("openSettings").setAttribute("aria-expanded", String(tab === "settings"));
+  $("openZoom").setAttribute("aria-expanded", String(tab === "zoom"));
+  if (tab) openSide.last = tab;
+  openSide.tab = tab;
+  store.set("dialer:side", tab);
 }
-$("phoneToggle").onclick = () => setPhoneMin(!document.body.classList.contains("phonemin"));
-setPhoneMin(store.get("dialer:phonemin", false));
+const toggleSide = tab => openSide(openSide.tab === tab ? "" : tab);
+$("openSettings").onclick = () => toggleSide("settings");
+$("openZoom").onclick = () => toggleSide("zoom");
+$("sideClose").onclick = () => openSide("");
+$("side").querySelector(".tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openSide(b.dataset.tab); };
+document.addEventListener("keydown", e => { if (e.key === "Escape" && openSide.tab) openSide(""); });
 $("callerId").onchange = e => { cfg.callerId = e.target.value.trim(); saveCfg(); };
 $("noAnswerCode").onchange = e => { cfg.noAnswer = e.target.value; saveCfg(); };
 $("gapSec").onchange = e => { cfg.gap = Math.max(1, Math.min(60, +e.target.value || 3)); e.target.value = cfg.gap; saveCfg(); };
@@ -943,8 +973,9 @@ function fillInputs() {
   $("gapSec").value = cfg.gap || 3;
   $("callerId").value = cfg.callerId || "";
   mountPhone();
+  openSide(store.get("dialer:side", ""));
   setData("sample", "sample", "Sample list", parseCSV(SAMPLE), []);
-  if (cfg.scriptUrl || cfg.sheetUrl) load(); else $("setup").open = true;
+  if (cfg.scriptUrl || cfg.sheetUrl) load(); else openSide("settings");
 }
 start();
 </script>
