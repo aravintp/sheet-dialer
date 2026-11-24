@@ -57,7 +57,7 @@ body {
 [hidden] { display: none !important; }
 .wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
 h1 { font: 700 1.6rem/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; }
-h2 { font: 600 0.75rem/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
+h2, .h2 { font: 600 0.75rem/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 header > div { min-width: 0; }
 .sub { color: var(--muted); font-size: 0.875rem; }
@@ -146,19 +146,25 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; max-width: calc(100vw - 32px); }
 /* Zoom Phone: the softphone sits beside the list on wide screens, under the contact card on phones */
 .phone { display: grid; gap: 8px; }
+.phonehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; background: none; border: none; padding: 4px 0; text-align: left; }
+.phonehead:hover { border: none; }
+.phonebody { display: grid; gap: 8px; }
+/* Collapsed: clip the dialer instead of display:none so it stays signed in and keeps sending call events */
+body.phonemin .phonebody { height: 0; overflow: hidden; }
+body.phonemin .phone { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; }
 .phone iframe { width: 100%; min-width: 350px; height: 580px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .callbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.875rem; padding: 10px 12px; border-radius: 8px; background: var(--bg); }
 .callbar.ringing { background: var(--t1-soft); color: var(--t1); }
 .callbar.connected { background: var(--t0-soft); color: var(--t0); }
 .callbar.wait { background: var(--t2-soft); color: var(--t2); }
-.callbar button { padding: 6px 10px; }
+.autoctl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .check { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--fg); }
 .check input { width: auto; }
 .zlog { margin: 0; max-height: 120px; overflow: auto; font: 500 0.7rem/1.5 var(--font-num); color: var(--muted); white-space: pre-wrap; }
 @media (min-width: 1000px) {
-  body.zoom .wrap { max-width: 980px; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 24px; }
-  body.zoom .wrap > * { grid-column: 1; }
-  body.zoom .wrap > .phone { grid-column: 2; grid-row: 1 / span 20; align-self: start; position: sticky; top: 16px; }
+  body.zoom:not(.phonemin) .wrap { max-width: 980px; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 24px; }
+  body.zoom:not(.phonemin) .wrap > * { grid-column: 1; }
+  body.zoom:not(.phonemin) .wrap > .phone { grid-column: 2; grid-row: 1 / span 20; align-self: start; position: sticky; top: 16px; }
 }
 /* Signed out: only the sign-in card shows */
 body.signedout .wrap > :not(#login) { display: none !important; }
@@ -250,11 +256,6 @@ header .actions { align-items: center; }
       <p class="name" id="curName">—</p>
       <div class="number" id="curNum">—</div>
     </div>
-    <a class="call" id="callBtn" href="#">
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1L6.6 10.8z"/></svg>
-      <span id="callLabel">Call</span>
-    </a>
-    <div class="callbar" id="callBar" hidden><span id="callText"></span><button id="callAct"></button></div>
     <dl class="fields" id="fields"></dl>
     <div>
       <div class="statushead"><h2>Status</h2><span class="sub" id="codesSource"></span></div>
@@ -262,6 +263,15 @@ header .actions { align-items: center; }
     </div>
     <label id="notesWrap">Notes <textarea id="notes"></textarea></label>
     <div class="saved" id="saved"></div>
+    <div class="autoctl" id="autoCtl" hidden>
+      <button id="autoStart" title="Turn auto-dial on or off">▶ Start</button>
+      <button id="autoPause" title="Hold before the next call without turning auto-dial off">❚❚ Pause</button>
+    </div>
+    <a class="call" id="callBtn" href="#">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1L6.6 10.8z"/></svg>
+      <span id="callLabel">Call</span>
+    </a>
+    <div class="callbar" id="callBar" hidden><span id="callText"></span></div>
     <div class="nav">
       <button id="prevBtn">← Back</button>
       <button id="copyNumBtn">Copy number</button>
@@ -270,9 +280,13 @@ header .actions { align-items: center; }
   </section>
 
   <aside class="phone" id="phone" hidden>
-    <h2>Zoom Phone</h2>
-    <div id="phoneSlot"></div>
-    <details><summary class="sub">Call events from Zoom</summary><pre class="zlog" id="zlog">None yet.</pre></details>
+    <button class="phonehead" id="phoneToggle" aria-expanded="true" aria-controls="phoneBody">
+      <span class="h2">Zoom Phone</span><span class="sub" id="phoneHint">Hide</span>
+    </button>
+    <div class="phonebody" id="phoneBody">
+      <div id="phoneSlot"></div>
+      <details><summary class="sub">Call events from Zoom</summary><pre class="zlog" id="zlog">None yet.</pre></details>
+    </div>
   </aside>
 
   <section style="display:grid;gap:10px">
@@ -775,25 +789,39 @@ function cancelWait() { if (Z.wait) clearInterval(Z.wait.tick); Z.wait = null; }
 
 function renderCall() {
   const bar = $("callBar"), c = Z.call;
-  let text = "", act = "", cls = "";
+  let text = "", cls = "";
+  $("autoCtl").hidden = !cfg.zoom;
   if (!cfg.zoom) { bar.hidden = true; return; }
-  if (Z.wait) { cls = "wait"; text = `Calling next in ${Math.ceil((Z.wait.until - Date.now()) / 1000)}s`; act = "Pause"; }
+  $("autoStart").textContent = cfg.autoDial ? "■ Stop" : "▶ Start";
+  $("autoStart").className = cfg.autoDial ? "" : "primary";
+  $("autoPause").textContent = Z.paused ? "▶ Resume" : "❚❚ Pause";
+  $("autoPause").disabled = !cfg.autoDial;
+  if (Z.wait) { cls = "wait"; text = `Calling next in ${Math.ceil((Z.wait.until - Date.now()) / 1000)}s`; }
   else if (callActive() && c.state === "dialing") { text = `Dialling row ${c.r}…`; }
   else if (callActive() && c.state === "ringing") { cls = "ringing"; text = `Ringing row ${c.r}…`; }
   else if (callActive() && c.state === "connected") { cls = "connected"; text = `Answered (row ${c.r}). Pick a status when you're done.`; }
   else if (c && c.state === "dialing") { text = "No call updates from Zoom. Check Zoom Phone is signed in."; }
   else if (c && c.answered && !statusOf(c.i)) { text = `Call ended. Pick a status for row ${c.r}.`; }
-  else if (cfg.autoDial && Z.paused) { text = "Auto-dial is paused"; act = "Resume"; }
+  else if (cfg.autoDial && Z.paused) { text = "Auto-dial is paused"; }
   else if (!Z.ready) { text = "Loading Zoom Phone…"; }
   bar.hidden = !text;
   bar.className = "callbar " + cls;
   $("callText").textContent = text;
-  $("callAct").hidden = !act;
-  $("callAct").textContent = act;
 }
-$("callAct").onclick = () => {
-  if (Z.wait) { cancelWait(); Z.paused = true; renderCall(); }
-  else if (Z.paused) { Z.paused = false; scheduleAutoDial(); }
+// Start/Stop turns auto-dial on or off (same as the setup checkbox). Pause holds it
+// without turning it off; a call already in progress carries on either way.
+$("autoStart").onclick = () => {
+  cfg.autoDial = !cfg.autoDial;
+  $("autoDial").checked = cfg.autoDial;
+  saveCfg();
+  Z.paused = false;
+  if (cfg.autoDial) scheduleAutoDial(); else cancelWait();
+  renderCall();
+};
+$("autoPause").onclick = () => {
+  Z.paused = !Z.paused;
+  if (Z.paused) cancelWait(); else scheduleAutoDial();
+  renderCall();
 };
 
 function resultRows() {
@@ -822,6 +850,15 @@ $("cc").oninput = e => { cfg.cc = e.target.value; saveCfg(); render(); };
 $("callBtn").onclick = e => { if (cfg.zoom) { e.preventDefault(); dial(S.cur); } };
 $("zoomOn").onchange = e => { cfg.zoom = e.target.checked; saveCfg(); mountPhone(); };
 $("autoDial").onchange = e => { cfg.autoDial = e.target.checked; saveCfg(); if (cfg.autoDial) { Z.paused = false; scheduleAutoDial(); } else cancelWait(); renderCall(); };
+// Collapsing is remembered per device, not synced: it's about this screen's size
+function setPhoneMin(min) {
+  document.body.classList.toggle("phonemin", min);
+  $("phoneToggle").setAttribute("aria-expanded", String(!min));
+  $("phoneHint").textContent = min ? "Show" : "Hide";
+  store.set("dialer:phonemin", min);
+}
+$("phoneToggle").onclick = () => setPhoneMin(!document.body.classList.contains("phonemin"));
+setPhoneMin(store.get("dialer:phonemin", false));
 $("callerId").onchange = e => { cfg.callerId = e.target.value.trim(); saveCfg(); };
 $("noAnswerCode").onchange = e => { cfg.noAnswer = e.target.value; saveCfg(); };
 $("gapSec").onchange = e => { cfg.gap = Math.max(1, Math.min(60, +e.target.value || 3)); e.target.value = cfg.gap; saveCfg(); };
